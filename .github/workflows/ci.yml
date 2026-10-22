@@ -1,0 +1,55 @@
+name: CI
+
+# The gate on every pull request: format, build, vet, test, offline (ADR 0001 §9).
+#
+# Go tooling directly, not Nix: the module uses only the standard library, so a
+# Nix evaluation would add a closure to build in front of checks that take
+# seconds. `go-version-file` reads `go.mod`, so the toolchain CI gates with is
+# the toolchain the module declares.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer commit on a pull request makes an in-flight run obsolete. Runs on main
+# are never cancelled.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  ci:
+    name: go ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Check formatting
+        run: |
+          if ! ./scripts/check-format.sh -d; then
+            echo "::error::gofmt would change these files - run gofmt -w on them and commit the result"
+            exit 1
+          fi
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      # Through the script, not `go test` directly: it runs the tests in a
+      # network namespace with no route out, and fails loudly if it can't
+      # isolate the network, so this step can't pass with the network up.
+      - name: Test, offline
+        run: ./scripts/offline-test.sh

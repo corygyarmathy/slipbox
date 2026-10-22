@@ -1,0 +1,114 @@
+
+## Coverage: source sentences not fully spanned by verified traces
+
+# What Pragmatism Means
+  ¶1 PARTIAL (uncovered in CAPS): SOME YEARS AGO, BEING WITH A CAMPING PARTY IN THE MOUNTAINS, I RETURNED FROM A SOLITARY RAMBLE TO FIND EVERYONE ENGAGED IN a ferocious metaphysical dispute.
+  ¶1 PARTIAL (uncovered in CAPS): The corpus of THE DISPUTE was a squirrel--a live squirrel supposed to be clinging to one side of a tree-trunk; while over against the tree's opposite side a human being was imagined to stand.
+  ¶1 UNCOVERED: He goes round the tree, sure enough, and the squirrel is on the tree; but does he go round the squirrel?
+  ¶1 UNCOVERED: In the unlimited leisure of the wilderness, discussion had been worn threadbare.
+  ¶1 UNCOVERED: Everyone had taken sides, and was obstinate; and the numbers on both sides were even.
+  ¶1 UNCOVERED: Each side, when I appeared, therefore appealed to me to make it a majority.
+  ¶1 PARTIAL (uncovered in CAPS): MINDFUL OF THE SCHOLASTIC ADAGE THAT WHENEVER YOU MEET A CONTRADICTION YOU MUST MAKE A DISTINCTION, I IMMEDIATELY SOUGHT AND FOUND ONE, AS FOLLOWS: "Which party is right," I SAID, "depends on what you PRACTICALLY MEAN by 'going round' the squirrel.
+  ¶2 UNCOVERED: Altho one or two of the hotter disputants called my speech a shuffling evasion, saying they wanted no quibbling or scholastic hair-splitting, but meant just plain honest English 'round,' the majority seemed to think that the distinction had assuaged the dispute.
+  ¶3 UNCOVERED: I tell this trivial anecdote because it is a peculiarly simple example of what I wish now to speak of as THE PRAGMATIC METHOD.
+
+# History of the Method
+  ¶1 PARTIAL (uncovered in CAPS): A GLANCE AT THE HISTORY OF THE IDEA WILL SHOW YOU STILL BETTER WHAT pragmatism MEANS.
+  ¶1 PARTIAL (uncovered in CAPS): IN AN ARTICLE ENTITLED 'HOW TO MAKE OUR IDEAS CLEAR,' IN THE 'POPULAR SCIENCE MONTHLY' FOR JANUARY OF THAT YEAR Mr. Peirce, after pointing out that our beliefs are really rules for action, said that to develope a thought's meaning, we need only determine what conduct it is fitted to produce: that conduct is for us its sole significance.
+  ¶2 UNCOVERED: It lay entirely unnoticed by anyone for twenty years, until I, in an address before Professor Howison's philosophical union at the university of California, brought it forward again and made a special application of it to religion.
+  ¶2 UNCOVERED: By that date (1898) the times seemed ripe for its reception.
+  ¶2 UNCOVERED: On all hands we find the 'pragmatic movement' spoken of, sometimes with respect, sometimes with contumely, seldom with clear understanding.
+  ¶3 PARTIAL (uncovered in CAPS): I FOUND A FEW YEARS AGO THAT Ostwald, the illustrious Leipzig chemist, had been making perfectly distinct use of the principle of pragmatism in his lectures on the philosophy of science, tho he had not called it by that name.
+  ¶4 PARTIAL (uncovered in CAPS): "All realities influence our practice," he wrote ME, "and that influence is their meaning for us.
+  ¶5 UNCOVERED: Ostwald in a published lecture gives this example of what he means.
+  ¶5 UNCOVERED: Chemists have long wrangled over the inner constitution of certain bodies called 'tautomerous.'
+  ¶5 UNCOVERED: Their properties seemed equally consistent with the notion that an instable hydrogen atom oscillates inside of them, or that they are instable mixtures of two bodies.
+  ¶5 UNCOVERED: Controversy raged; but never was decided.
+  ¶5 UNCOVERED: "It would never have begun," says Ostwald, "if the combatants had asked themselves what particular experimental fact could have been made different by one or the other view being correct.
+  ¶5 UNCOVERED: For it would then have appeared that no difference of fact could possibly ensue; and the quarrel was as unreal as if, theorizing in primitive times about the raising of dough by yeast, one party should have invoked a 'brownie,' while another insisted on an 'elf' as the true cause of the phenomenon."
+  ¶7 UNCOVERED: I believe in that destiny, and I hope I may end by inspiring you with my belief.
+
+# The Method's Character and Affinities
+  ¶1 PARTIAL (uncovered in CAPS): Pragmatism represents a perfectly familiar attitude in philosophy, the empiricist attitude, but it represents it, AS IT SEEMS TO ME, both in a more radical and in a less objectionable form than it has ever yet assumed.
+  ¶2 PARTIAL (uncovered in CAPS): At the same time IT does not stand for any special results.
+  ¶2 PARTIAL (uncovered in CAPS): But the general triumph of that method would mean an enormous change in WHAT I CALLED IN MY LAST LECTURE the 'temperament' of philosophy.
+  ¶2 PARTIAL (uncovered in CAPS): Teachers of the ultra-rationalistic type would be frozen out, MUCH AS THE COURTIER TYPE IS FROZEN OUT IN REPUBLICS, AS THE ULTRAMONTANE TYPE OF PRIEST IS FROZEN OUT IN PROTESTANT LANDS.
+  ¶3 UNCOVERED: You know how men have always hankered after unlawful magic, and you know what a great part, in magic, WORDS have always played.
+  ¶3 UNCOVERED: If you have his name, or the formula of incantation that binds him, you can control the spirit, genie, afrite, or whatever the power may be.
+  ¶3 UNCOVERED: Solomon knew the names of all the spirits, and having their names, he held them subject to his will.
+  ¶3 PARTIAL (uncovered in CAPS): SO the universe has always appeared to the natural mind as a kind of enigma, of which the key must be sought in the shape of some illuminating or power-bringing word or name.
+  ¶8 UNCOVERED: So much for the pragmatic method!
+  ¶8 UNCOVERED: You may say that I have been praising it rather than explaining it to you, but I shall presently explain it abundantly enough by showing how it works on some familiar problems.
+  ¶8 UNCOVERED: I mean to give a whole lecture to the statement of that theory, after first paving the way, so I can be very brief now.
+  ¶8 UNCOVERED: But brevity is hard to follow, so I ask for your redoubled attention for a quarter of an hour.
+  ¶8 UNCOVERED: If much remains obscure, I hope to make it clearer in the later lectures.
+
+# Pragmatism as a Theory of Truth
+  ¶1 UNCOVERED: His mind also thundered and reverberated in syllogisms.
+  ¶1 UNCOVERED: He also thought in conic sections, squares and roots and ratios, and geometrized like Euclid.
+  ¶1 UNCOVERED: He made Kepler's laws for the planets to follow; he made velocity increase proportionally to the time in falling bodies; he made the law of the sines for light to obey when refracted; he established the classes, orders, families and genera of plants and animals, and fixed the distances between them.
+  ¶1 UNCOVERED: He thought the archetypes of all things, and devised their variations; and when we rediscover any one of these his wondrous institutions, we seize his mind in its very literal intention.
+  ¶3 UNCOVERED: If I mention the names of Sigwart, Mach, Ostwald, Pearson, Milhaud, Poincare, Duhem, Ruyssen, those of you who are students will easily identify the tendency I speak of, and will think of additional names.
+  ¶5 UNCOVERED: Messrs.
+  ¶5 PARTIAL (uncovered in CAPS): In the establishment of these other sciences, the successful stroke was always to take some simple process actually observable in operation--AS DENUDATION BY WEATHER, SAY, OR VARIATION FROM PARENTAL TYPE, OR CHANGE OF DIALECT BY INCORPORATION OF NEW WORDS AND PRONUNCIATIONS--and then to generalize it, making it apply to all times, and produce great results by summating its effects through the ages.
+
+# The Formation of New Beliefs
+  ¶2 UNCOVERED: Time and space, cause and effect, nature and history, and one's own biography remain untouched.
+  ¶3 PARTIAL (uncovered in CAPS): THE POINT I NOW URGE YOU TO OBSERVE PARTICULARLY IS the part played by the older truths.
+  ¶3 PARTIAL (uncovered in CAPS): Failure to take account of IT is the source of much of the unjust criticism leveled against pragmatism.
+  ¶4 UNCOVERED: You doubtless wish examples of this process of truth's growth, and the only trouble is their superabundance.
+  ¶5 UNCOVERED: If I should now utter piercing shrieks and act like a maniac on this platform, it would make many of you revise your ideas as to the probable worth of my philosophy.
+  ¶5 UNCOVERED: 'Radium' came the other day as part of the day's content, and seemed for a moment to contradict our ideas of the whole order of nature, that order having come to be identified with what is called the conservation of energy.
+  ¶5 UNCOVERED: The mere sight of radium paying heat away indefinitely out of its own pocket seemed to violate that conservation.
+  ¶5 UNCOVERED: What to think?
+  ¶5 UNCOVERED: If the radiations from it were nothing but an escape of unsuspected 'potential' energy, pre-existent inside of the atoms, the principle of conservation would be saved.
+  ¶5 UNCOVERED: The discovery of 'helium' as the radiation's outcome, opened a way to this belief.
+  ¶5 UNCOVERED: So Ramsay's view is generally held to be true, because, altho it extends our old ideas of energy, it causes a minimum of alteration in their nature.
+  ¶6 UNCOVERED: I need not multiply instances.
+  ¶6 PARTIAL (uncovered in CAPS): It must both lean on old truth and grasp new fact; and its success (AS I SAID A MOMENT AGO) in doing this, is a matter for the individual's appreciation.
+  ¶9 PARTIAL (uncovered in CAPS): Mr. Schiller still gives to all this view of truth the name of 'Humanism,' but, for this doctrine too, the name of pragmatism seems fairly to be in the ascendant, SO I WILL TREAT IT UNDER THE NAME OF PRAGMATISM IN THESE LECTURES.
+  ¶10 UNCOVERED: And these two things must be our future topics.
+
+# Rationalistic Criticisms
+  ¶1 UNCOVERED: What I have said of the theory of truth will, I am sure, have appeared obscure and unsatisfactory to most of you by reason of us brevity.
+  ¶1 UNCOVERED: I shall make amends for that hereafter.
+  ¶1 UNCOVERED: In a lecture on 'common sense' I shall try to show what I mean by truths grown petrified by antiquity.
+  ¶1 UNCOVERED: In another lecture I shall expatiate on the idea that our thoughts become true in proportion as they successfully exert their go-between function.
+  ¶1 UNCOVERED: In a third I shall show how hard it is to discriminate subjective from objective factors in Truth's development.
+  ¶1 UNCOVERED: You may not follow me wholly in these lectures; and if you do, you may not wholly agree with me.
+  ¶1 UNCOVERED: But you will, I know, regard me at least as serious, and treat my effort with respectful consideration.
+  ¶2 PARTIAL (uncovered in CAPS): YOU WILL PROBABLY BE SURPRISED TO LEARN, THEN, THAT Messrs.
+  ¶2 UNCOVERED: In influential quarters Mr. Schiller, in particular, has been treated like an impudent schoolboy who deserves a spanking.
+  ¶2 PARTIAL (uncovered in CAPS): I SHOULD NOT MENTION THIS, BUT FOR THE FACT THAT IT throws so much sidelight upon that rationalistic temper to which I have opposed the temper of pragmatism.
+  ¶3 UNCOVERED: See the exquisite contrast of the types of mind!
+  ¶3 UNCOVERED: If the two universes were offered, he would always choose the skinny outline rather than the rich thicket of reality.
+  ¶3 UNCOVERED: It is so much purer, clearer, nobler.
+  ¶4 UNCOVERED: I hope that as these lectures go on, the concreteness and closeness to facts of the pragmatism which they advocate may be what approves itself to you as its most satisfactory peculiarity.
+  ¶4 PARTIAL (uncovered in CAPS): IT only follows HERE the example of the sister-sciences, interpreting the unobserved by the observed.
+  ¶4 PARTIAL (uncovered in CAPS): It converts the absolutely empty notion of a static relation of 'correspondence' (WHAT THAT MAY MEAN WE MUST ASK LATER) between our minds and reality, into that of a rich and active commerce (that anyone may follow in detail and understand) between particular thoughts of ours, and the great universe of other experiences in which they play their parts and have their uses.
+
+# Pragmatism as Mediator Between Empiricism and Religion
+  ¶1 PARTIAL (uncovered in CAPS): But ENOUGH OF THIS AT PRESENT?
+  ¶1 UNCOVERED: The justification of what I say must be postponed.
+  ¶1 PARTIAL (uncovered in CAPS): I WISH NOW TO ADD A WORD IN FURTHER EXPLANATION OF THE CLAIM I MADE AT OUR LAST MEETING, THAT pragmatism may be a happy harmonizer of empiricist ways of thinking, with the more religious demands of human beings.
+  ¶2 PARTIAL (uncovered in CAPS): Men who are strongly of the fact-loving temperament, YOU MAY REMEMBER ME TO HAVE SAID, are liable to be kept at a distance by the small sympathy with facts which that philosophy from the present-day fashion of idealism offers them.
+  ¶3 PARTIAL (uncovered in CAPS): BUT, AS I SAID IN MY FIRST LECTURE, the brand of pantheism offered is hard for them to assimilate if they are lovers of facts, or empirically minded.
+  ¶3 UNCOVERED: Like the sick lion in Esop's fable, all footprints lead into his den, but nulla vestigia retrorsum.
+  ¶4 UNCOVERED: Far be it from me to deny the majesty of this conception, or its capacity to yield religious comfort to a most respectable class of minds.
+  ¶4 PARTIAL (uncovered in CAPS): It is eminently a product of WHAT I HAVE VENTURED TO CALL the rationalistic temper.
+  ¶4 PARTIAL (uncovered in CAPS): In this real world of sweat and dirt, IT SEEMS TO ME THAT when a view of things is 'noble,' that ought to count as a presumption against its truth, and as a philosophic disqualification.
+
+# The True Is the Good in the Way of Belief
+  ¶1 UNCOVERED: To answer this difficulty fully is impossible at this stage of my account.
+  ¶1 UNCOVERED: You touch here upon the very central point of Messrs.
+  ¶1 UNCOVERED: Schiller's, Dewey's and my own doctrine of truth, which I cannot discuss with detail until my sixth lecture.
+  ¶1 PARTIAL (uncovered in CAPS): LET ME NOW SAY ONLY THIS, THAT truth is ONE SPECIES OF GOOD, and not, as is usually supposed, a category distinct from good, and co-ordinate with it.
+  ¶1 PARTIAL (uncovered in CAPS): But in this world, JUST AS CERTAIN FOODS ARE NOT ONLY AGREEABLE TO OUR TASTE, BUT GOOD FOR OUR TEETH, OUR STOMACH AND OUR TISSUES; SO certain ideas are not only agreeable to think about, or agreeable as supporting other ideas that we are fond of, but they are also helpful in life's practical struggles.
+  ¶4 PARTIAL (uncovered in CAPS): I SAID JUST NOW THAT what is better for us to believe is true UNLESS THE BELIEF INCIDENTALLY CLASHES WITH SOME OTHER VITAL BENEFIT.
+  ¶6 UNCOVERED: You see by this what I meant when I called pragmatism a mediator and reconciler and said, borrowing the word from Papini, that he unstiffens our theories.
+  ¶6 PARTIAL (uncovered in CAPS): SHE has in fact no prejudices whatever, no obstructive dogmas, no rigid canons of what shall count as proof.
+  ¶9 UNCOVERED: In my last lecture I shall return again to the relations of pragmatism with religion.
+
+## Totals
+  exact 284, fuzzy 0, broken 0, untraced statements 0, statements 52
+  covered sentences: 222/314 (71%)

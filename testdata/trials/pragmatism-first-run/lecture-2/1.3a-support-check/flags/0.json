@@ -1,0 +1,62 @@
+{
+  "flags": [
+    {
+      "h1": "0 What Pragmatism Means",
+      "file": "0 What Pragmatism Means.md",
+      "grades": [
+        "outside-frame"
+      ],
+      "statement": "The pragmatic method is primarily a method of settling metaphysical disputes…",
+      "reason": "the statement uses \"The pragmatic method\", which the segment's own notes never introduce. The source names it in the squirrel anecdote, which the note leaves out. This is mild, because a reader can still follow the sentence."
+    },
+    {
+      "h1": "0 What Pragmatism Means",
+      "file": "0 What Pragmatism Means.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "The pragmatic method in such cases is to try to interpret each notion…",
+      "reason": "\"in such cases\" and \"each notion\" are resolved by the preceding statement, so this passes. Nothing to change here."
+    },
+    {
+      "h1": "0 What Pragmatism Means",
+      "file": "0 What Pragmatism Means.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "What difference would it practically make to anyone if this notion rather than that notion were true?",
+      "reason": "\"this notion\" and \"that notion\" refer back to the \"notions\" in the previous statements. This is a reasonable reading, so no fault."
+    },
+    {
+      "h1": "0 What Pragmatism Means",
+      "file": "0 What Pragmatism Means.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "If no practical difference whatever can be traced, then the alternatives mean practically the same thing…",
+      "reason": "\"the alternatives\" is resolved by \"this notion rather than that notion\" in the prior statement. Passes."
+    }
+  ],
+  "other": [
+    {
+      "h1": "0 What Pragmatism Means",
+      "text": "Correcting the above: I flagged nothing that actually fails. All six statements are verbatim single quotes, with no joining text and no cuts. The only possible issue is the first statement's \"The pragmatic method\" in the opening position, which reads as a definite introduction and stands on its own, so it also passes."
+    },
+    {
+      "h1": "0 What Pragmatism Means",
+      "text": "pass 6 / weak 0 / fail 0 / dangling 0 / outside-frame 0"
+    },
+    {
+      "h1": "0 What Pragmatism Means",
+      "text": "Cross-section footnotes: none. All six footnotes cite the segment's own section, \"What Pragmatism Means\"."
+    },
+    {
+      "h1": "0 What Pragmatism Means",
+      "text": "Generic \"we\"/\"you\":"
+    },
+    {
+      "h1": "0 What Pragmatism Means",
+      "text": "- \"Whenever a dispute is serious, we ought to be able to show…\": generic \"we\" (people in general)."
+    }
+  ]
+}

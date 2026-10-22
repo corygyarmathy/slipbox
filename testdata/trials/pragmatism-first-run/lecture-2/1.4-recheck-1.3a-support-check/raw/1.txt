@@ -1,0 +1,22 @@
+# 1 History of the Method
+
+No statement in this note is non-pass on support, reading alone, or cuts.
+
+Pass 25 / weak 0 / fail 0 / dangling 0 / outside-frame 0
+
+Cross-section footnotes:
+- [^23] `#What Pragmatism Means` "a method of settling metaphysical disputes that otherwise might be interminable.": **pass**. It names the right referent for "the pragmatic method". The source's "primarily" is dropped, but the appositive still holds.
+
+Generic "we"/"you":
+- "our beliefs are really rules for action" (generic "our")
+- "we need only determine what conduct it is fitted to produce" (generic "we")
+- "we need only consider what conceivable effects" (generic "we")
+- "what sensations we are to expect from it, and what reactions we must prepare" (generic "we")
+- "Our conception of these effects" (generic "our")
+- "one must get accustomed to applying it" (generic "one")
+- "the moment you subject them to this simple test" (generic "you")
+- "to you and me" (author and reader together)
+- "our life" (generic "our")
+- "our words 'practice' and 'practical'" (generic "our")
+- "our thoughts" / "our thought-distinctions" (generic "our")
+- "meaning ... there is for us none" (generic "us")

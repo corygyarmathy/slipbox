@@ -1,0 +1,207 @@
+{
+  "flags": [
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "file": "5 Rationalistic Criticisms.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "Messrs. Schiller's and Dewey's theories have suffered…",
+      "reason": "\"Messrs.\" is stitched to \"Schiller's and Dewey's\"; the note never names the speaker or says who these two are, and \"them\" in the next statement depends on it. \"Messrs.\" and \"Schiller's\" come from two separate footnotes, but the join reads acceptably. Mostly a dangling reference to the two men (their roles are never given in this note)."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "file": "5 Rationalistic Criticisms.md",
+      "grades": [
+        "reworded"
+      ],
+      "statement": "A hailstorm of contempt and ridicule throws so much sidelight…",
+      "reason": "the source subject is \"I should not mention this, but for the fact that it throws…\", where \"it\" is the fact that they were treated with contempt. The note makes the hailstorm itself the subject, and it drops the \"I should not mention this, but for the fact\" framing. Support is weak: the quote \"throws so much sidelight\" is attached to a repeated phrase."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "file": "5 Rationalistic Criticisms.md",
+      "grades": [
+        "reads wrong"
+      ],
+      "statement": "…to which I, William James, have opposed…",
+      "reason": "the author name span \"William James\" is inserted mid-sentence in apposition to \"I\". A cut of the \"I\" would work, e.g. \"…the rationalistic temper to which pragmatism is opposed\", or the quote could be left as \"I\" with an earlier statement naming James. Grade: cut would do."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "file": "5 Rationalistic Criticisms.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "This pragmatist talk about truths in the plural…",
+      "reason": "\"This pragmatist talk\" has no antecedent in the note, and \"the typical intellectualist mind\" is introduced without setup. Marginal."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "file": "5 Rationalistic Criticisms.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "Such truths are not real truth.",
+      "reason": "\"Such truths\" and \"Such tests\" point back to the previous statement; resolvable from it. Pass for \"Such truths\"; \"Such tests\" is resolvable by reference to \"utility and satisfactoriness\". Pass."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "file": "5 Rationalistic Criticisms.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "Such tests are merely subjective.",
+      "reason": "\"Such truths\" and \"Such tests\" point back to the previous statement; resolvable from it. Pass for \"Such truths\"; \"Such tests\" is resolvable by reference to \"utility and satisfactoriness\". Pass."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "file": "5 Rationalistic Criticisms.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "As against this, objective truth must be…",
+      "reason": "\"this\" resolves to the preceding objections. Pass. These objections are the rationalist's, and the note never states that the speaker is the rationalist, so the voice is ambiguous. The statements read as flat claims rather than as reported rationalist views, which is a support problem. Weak."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "file": "5 Rationalistic Criticisms.md",
+      "grades": [
+        "weak"
+      ],
+      "statement": "It must be an absolute correspondence…",
+      "reason": "these are the typical intellectualist's views in James's voice, but the note gives no attribution, so they read as the note's own claims. Support is weak on how they read."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "file": "5 Rationalistic Criticisms.md",
+      "grades": [
+        "weak"
+      ],
+      "statement": "It must be what we OUGHT to think, unconditionally.",
+      "reason": "these are the typical intellectualist's views in James's voice, but the note gives no attribution, so they read as the note's own claims. Support is weak on how they read."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "file": "5 Rationalistic Criticisms.md",
+      "grades": [
+        "weak"
+      ],
+      "statement": "The conditioned ways…",
+      "reason": "these are the typical intellectualist's views in James's voice, but the note gives no attribution, so they read as the note's own claims. Support is weak on how they read."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "file": "5 Rationalistic Criticisms.md",
+      "grades": [
+        "weak"
+      ],
+      "statement": "Down with psychology…",
+      "reason": "these are the typical intellectualist's views in James's voice, but the note gives no attribution, so they read as the note's own claims. Support is weak on how they read."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "file": "5 Rationalistic Criticisms.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "Truth, for him, becomes a class-name…",
+      "reason": "\"him\" resolves to \"The pragmatist\" in the previous statement. Pass."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "file": "5 Rationalistic Criticisms.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "For the rationalist it remains a pure abstraction, to the bare name of which we must defer.",
+      "reason": "\"it\" resolves to truth. \"We\" here is generic. Pass."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "file": "5 Rationalistic Criticisms.md",
+      "grades": [
+        "cut lost content"
+      ],
+      "statement": "He accuses us, Messrs. Dewey, Schiller and their allies, of DENYING truth; whereas we have only sought…",
+      "reason": "the source says \"He accuses us of DENYING truth\", where \"us\" means James and the pragmatists. The note splices a name span so \"us\" appears to equal Dewey, Schiller and allies. That is a change of referent. See name span below."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "file": "5 Rationalistic Criticisms.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "Pragmatism only follows the example of the sister-sciences…",
+      "reason": "\"sister-sciences\" is not explained in this note. Also \"It brings old and new harmoniously together\" is vague without an antecedent. The cut also dropped \"here\" and \"It only follows here the example\", plus the \"concreteness and closeness to facts\" framing. The word \"only\" was moved: the source reads \"It only follows here\", and the note's \"only follows\" is a verbatim fragment, so it is fine. Dangling on \"sister-sciences\"."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "file": "5 Rationalistic Criticisms.md",
+      "grades": [
+        "outside-frame"
+      ],
+      "statement": "…what that may mean we must ask later",
+      "reason": "the cut removed this parenthetical; it is not an issue here."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "file": "5 Rationalistic Criticisms.md",
+      "grades": [
+        "cut lost content"
+      ],
+      "statement": "It converts the absolutely empty notion of a static relation of 'correspondence' between our minds and reality, into…",
+      "reason": "the cut drops the parenthetical \"(what that may mean we must ask later)\"; it carries only the author's stance and a pointer, so no content lost. Pass."
+    }
+  ],
+  "other": [
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "text": "- [pass-with-note] \"All rationalism has risen against them.\": \"them\" resolves to the theories. Pass."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "text": "Counts: pass 14 / weak 5 / fail 0 / dangling 5 / outside-frame 0"
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "text": "Cross-section footnotes:"
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "text": "- [^5] \"William James\" (section: the lecture file, no heading; an author name span): cut would do. The \"I\" can be left or removed, and the insertion makes the sentence read oddly (\"I, William James, have opposed\"). Reads wrong."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "text": "- [^23] \"Dewey, Schiller and their allies\" (section: Pragmatism as a Theory of Truth): wrong referent for \"us\". In the source, \"us\" is James with the pragmatists. The name span names others, and the statement then reads as if Dewey and Schiller were the accusers' targets only. In context James does include himself with them (\"Messrs. Dewey, Schiller and their allies\" appear in that earlier paragraph), but \"Messrs.\" comes from this section and is spliced with the wrong section's names. Grade: wrong referent (partial)."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "text": "Generic \"we\"/\"you\":"
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "text": "- \"we must defer\" (note 5, statement 19): generic."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "text": "- \"we OUGHT to think\" / \"we DO think\": generic."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "text": "- \"our thoughts\", \"our minds\": generic."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "text": "- \"we have only sought to trace…\": not generic; it means James and the pragmatists, and the note does not name them except through the spliced span. Dangling."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "text": "- \"Your typical ultra-abstractionist\": generic \"you\" to the reader."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "text": "- \"anyone may follow\": generic."
+    }
+  ]
+}

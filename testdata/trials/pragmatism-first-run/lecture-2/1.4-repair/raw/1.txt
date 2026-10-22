@@ -1,0 +1,7 @@
+=== EDIT: 1 History of the Method.md ===
+--- REPLACE ---
+There is absolutely nothing new in the pragmatic method.[^22]
+--- WITH ---
+There is absolutely nothing new in the pragmatic method{, }a method of settling metaphysical disputes that otherwise might be interminable.
+=== REPORT ===
+- "There is absolutely nothing new in the pragmatic method.": reads-alone flag, dangling "the pragmatic method". Fixed with a name span. A cut won't work because the phrase is the statement's subject. I appended, as an appositive, the noun phrase that defines the method in the lecture's opening: "a method of settling metaphysical disputes that otherwise might be interminable". It comes from "The pragmatic method is primarily a method of settling metaphysical disputes that otherwise might be interminable." The "it"/"its" in the statements that follow (Socrates, Aristotle, Locke, Berkeley and Hume, the forerunners) now resolve to this method.

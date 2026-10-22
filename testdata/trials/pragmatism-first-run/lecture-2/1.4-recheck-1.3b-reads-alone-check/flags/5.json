@@ -1,0 +1,28 @@
+{
+  "flags": [
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "file": "5 Rationalistic Criticisms.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "Pragmatism only follows the example of the sister-sciences, interpreting…",
+      "reason": "\"the sister-sciences\": no earlier statement in the note says which sciences these are or what they are sisters of."
+    },
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "file": "5 Rationalistic Criticisms.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "It brings old and new harmoniously together.",
+      "reason": "\"old and new\": the statement doesn't say old and new what, and nothing earlier in the note supplies it."
+    }
+  ],
+  "other": [
+    {
+      "h1": "5 Rationalistic Criticisms",
+      "text": "pass 21 / dangling 2 / outside-frame 0"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "flags": [
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "file": "7 The True Is the Good in the Way of Belief.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "My belief in the Absolute, based on the good it does me…",
+      "reason": "\"the Absolute\": a technical term used as if already introduced. No earlier statement in the note says what it is."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "file": "7 The True Is the Good in the Way of Belief.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "Grant that it may be true in giving me a moral holiday.",
+      "reason": "\"a moral holiday\": a term used as if already understood. The note never says what a moral holiday is or how the Absolute gives one."
+    }
+  ],
+  "other": [
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "text": "pass 46 / dangling 2 / outside-frame 0"
+    }
+  ]
+}

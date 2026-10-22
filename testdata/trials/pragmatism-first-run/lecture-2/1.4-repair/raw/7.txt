@@ -1,0 +1,18 @@
+=== EDIT: 7 The True Is the Good in the Way of Belief.md ===
+--- REPLACE ---
+My belief in the Absolute, based on the good it does me, must run the gauntlet of all my other beliefs.[^22]
+--- WITH ---
+My belief in the Absolute{ (}the Absolute of transcendental idealism{), }based on the good it does me, must run the gauntlet of all my other beliefs.
+--- REPLACE ---
+Grant that it may be true in giving me a moral holiday.[^23]
+--- WITH ---
+Grant that it may be true in giving me a moral holiday{, }to let the world wag in its own way.
+=== REPORT ===
+- "Pragmatism says no, and I, William James, fully agree with her." / mechanical CROSS-SEGMENT [^13] and support check "cut would do". Kept. This is the note's first "I". The author name span there also resolves the later first-person statements, and no cut can remove those: "My belief in the Absolute…", "I personally just give up the Absolute", "I just TAKE my moral holidays…" and "My disbelief in the Absolute…". The span comes from the `source:` line, as the author name span rule requires.
+- "But in this world, certain ideas are not only agreeable…" / cut lost content. Kept. The dropped "just as certain foods… so" is an analogy, which counts as illustration under the selection rule. The claim survives whole. "In a world like that…", the statement just before it in the note, supplies the contrast for "But in this world".
+- "My belief in the Absolute, based on the good it does me…" / dangling "the Absolute" (both checks). Fixed by a name span: "the Absolute of transcendental idealism" (segment 6), put in parentheses after "the Absolute", with the rest of the sentence quoted as before.
+- "Grant that it may be true in giving me a moral holiday." / dangling "a moral holiday" (both checks). Fixed by a name span: "to let the world wag in its own way" (segment 6), as an appositive. "It" resolves to the belief in the Absolute in the statement before it.
+- "It happens to be associated with a kind of logic…" / dangling (support check). Kept. "It" resolves to the Absolute, which is now named in the repaired statement above.
+- "I just TAKE my moral holidays…" / dangling (support check). Kept. "moral holidays" is resolved by the gloss added to "Grant that it may be true…", and "I" is resolved by the author name span.
+- "If I could restrict my notion of the Absolute to its bare holiday-giving value…" / dangling (support check). Kept. The Absolute and the moral holiday are both now introduced earlier in the note.
+- "My disbelief in the Absolute means then disbelief in those other supernumerary features…" / dangling (support check). Kept, for the same reason. "those other supernumerary features" resolves to the statement before it.

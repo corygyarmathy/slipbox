@@ -1,0 +1,24 @@
+# 7 The True Is the Good in the Way of Belief
+
+No statement received a non-pass grade, so there are no fault lines.
+
+pass 51 / weak 0 / fail 0 / dangling 0 / outside-frame 0
+
+Cross-section footnotes:
+- [^13] "William James" (author name span, frontmatter source line): pass. It is the first naming of the author in the note, so the later "my"/"I" statements resolve. No cut of the "I" in "Pragmatism says no, and I fully agree with her" would carry the agreement without leaving the "I" dangling.
+- [^23] "the Absolute of transcendental idealism" (section "Pragmatism as Mediator Between Empiricism and Religion"): pass. It names the same Absolute that James called "majestic" and "sterile" there and returns to here.
+- [^26] "to let the world wag in its own way" (section "Pragmatism as Mediator Between Empiricism and Religion"): pass. In that section it is the appositive gloss on "moral holiday", so it names the right referent. The splice reads slightly awkwardly but is still a sentence.
+
+"we"/"you" judged generic:
+- [^3] "Surely you must admit this…": "you" addressed to the reader.
+- [^4] "our duty would be to SHUN truth": "our" generic.
+- [^6] "ideas that we are fond of": "we" generic.
+- [^7] "we should lead", "BETTER FOR US": "we"/"us" generic.
+- [^10] "what we OUGHT to believe", "none of you": "we" generic, "you" the audience.
+- [^11] "Ought we ever not to believe…": "we" generic.
+- [^12] "can we then keep…": "we" generic.
+- [^15] "Probably you also agree…", "if we practically did believe…": "you" and "we" generic.
+- [^16] "Your suspicion…", "when you pass from the abstract to the concrete": "you" addressed to the reader.
+- [^17] "better for us to believe": "us" generic.
+- [^32] "we cannot easily thus restrict our hypotheses": "we" generic.
+- [^50] "But you see already how democratic she is": "you" addressed to the reader.

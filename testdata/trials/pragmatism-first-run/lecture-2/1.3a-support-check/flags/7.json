@@ -1,0 +1,209 @@
+{
+  "flags": [
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "file": "7 The True Is the Good in the Way of Belief.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "Truth is ONE SPECIES OF GOOD, and not, as is usually supposed…",
+      "reason": "Quote begins \"truth is ONE SPECIES OF GOOD\" and the statement reads fine, but \"Truth\" is not tied to any named speaker. This is a general claim and reads alone, so no fault. (Not flagged; ignore.)"
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "file": "7 The True Is the Good in the Way of Belief.md",
+      "grades": [
+        "cut lost content"
+      ],
+      "statement": "But in this world, certain ideas are not only agreeable…",
+      "reason": "The source reads \"just as certain foods are not only agreeable to our taste, but good for our teeth, our stomach and our tissues; so certain ideas are…\". The cut drops the food analogy and the \"so\", which linked the claim to its argument. The joined statement is fine on its own, but the quotes splice \"But in this world\" onto the second half of a \"just as… so…\" sentence."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "file": "7 The True Is the Good in the Way of Belief.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "Pragmatism says no, and I, William James, fully agree with her.",
+      "reason": "\"no\" refers to the previous question (\"can we keep… permanently apart?\"), which is in the note, so that part resolves. The author name span \"William James\" is cut-wise questionable (see below)."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "file": "7 The True Is the Good in the Way of Belief.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "Grant that it may be true in giving me a moral holiday.",
+      "reason": "\"the Absolute\" appears in the preceding statement, so it resolves. \"me\" is covered by the earlier \"I, William James\". No fault. (Not flagged; ignore.)"
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "file": "7 The True Is the Good in the Way of Belief.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "It happens to be associated with a kind of logic…",
+      "reason": "\"It\" refers to the Absolute, which is named in the previous statements. Resolves. No fault."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "file": "7 The True Is the Good in the Way of Belief.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "Pragmatism has in fact no prejudices whatever…",
+      "reason": "the quote cuts \"You see by this what I meant when I called pragmatism a mediator… She has\", dropping the \"She\" and the mediator framing. \"Pragmatism\" stands in for \"She\". The reworded subject is acceptable; this is a trim of pointing and framing only. No fault. (Not flagged; ignore.)"
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "file": "7 The True Is the Good in the Way of Belief.md",
+      "grades": [
+        "weak"
+      ],
+      "statement": "It follows that in the religious field she is at a great advantage…",
+      "reason": "\"she\" is not resolved by \"Pragmatism\" in the earlier statement of the same paragraph? It is resolved (\"Pragmatism… She is completely genial.\"). Support passes. No fault."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "file": "7 The True Is the Good in the Way of Belief.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "In short, she widens the field of search for God.",
+      "reason": "\"she\" refers to Pragmatism in the previous paragraph; the earlier paragraph is in the same note, so it resolves. No fault."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "file": "7 The True Is the Good in the Way of Belief.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "But you see already how democratic she is.",
+      "reason": "the quote cuts \"In my last lecture I shall return again to the relations of pragmatism with religion.\" The \"But\" joins to a dropped sentence, and \"already\" points to the lecture's progress. \"She\" resolves. Trim is pointing only. No fault."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "file": "7 The True Is the Good in the Way of Belief.md",
+      "grades": [
+        "outside-frame"
+      ],
+      "statement": "Surely you must admit this, that if there were NO good for life in true ideas…",
+      "reason": "\"this\" points to the preceding statement, which is in the note. No fault."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "file": "7 The True Is the Good in the Way of Belief.md",
+      "grades": [
+        "cut lost content"
+      ],
+      "statement": "Pragmatism says no, and I, William James, fully agree with her.",
+      "reason": "The quote \"Pragmatism says no, and I fully agree with her\" is complete. No loss."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "file": "7 The True Is the Good in the Way of Belief.md",
+      "grades": [
+        "cut lost content"
+      ],
+      "statement": "What is better for us to believe is true UNLESS THE BELIEF INCIDENTALLY CLASHES…",
+      "reason": "the source reads \"I said just now that what is better for us to believe is true UNLESS…\". The cut drops \"I said just now that\", which is only a back-reference. Fine."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "file": "7 The True Is the Good in the Way of Belief.md",
+      "grades": [
+        "cut lost content"
+      ],
+      "statement": "My belief in the Absolute, based on the good it does me…",
+      "reason": "\"the Absolute\" is not introduced earlier in this note, and no earlier statement defines it. This is a dangling reference."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "file": "7 The True Is the Good in the Way of Belief.md",
+      "grades": [
+        "cut lost content"
+      ],
+      "statement": "But in this world, certain ideas are not only agreeable…",
+      "reason": "the dropped \"just as certain foods… so\" frame carried the analogy, and \"But in this world\" is left contrasting with a world described only in the previous statement."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "file": "7 The True Is the Good in the Way of Belief.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "My belief in the Absolute, based on the good it does me, must run the gauntlet of all my other beliefs.",
+      "reason": "\"the Absolute\" is not introduced anywhere earlier in the note. The same applies to \"Grant that it may be true in giving me a moral holiday.\" (\"it\", \"moral holiday\"), \"It happens to be associated…\", \"I just TAKE my moral holidays…\", \"If I could restrict my notion of the Absolute to its bare holiday-giving value…\", and \"My disbelief in the Absolute…\". Each depends on the Absolute and the \"moral holiday\" discussion from the previous section."
+    }
+  ],
+  "other": [
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "text": "Correction to the above, since several entries were reasoning notes rather than faults. The real non-pass items are:"
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "text": "pass 40 / weak 0 / fail 0 / dangling 6 / outside-frame 0 (plus 1 cut lost content)"
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "text": "Cross-section footnotes:"
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "text": "- [^13] \"William James\" (author name span, no section): cut would do. Quote \"Pragmatism says no, and I fully agree with her.\" works without the name, and the name does not resolve the \"I\" any better than the original. Under the brief's rule the span is allowed only where no cut works, so it is not justified. Same applies to the fact that the statement still reads fine, but the span is unnecessary."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "text": "\"we\"/\"you\" judged generic:"
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "text": "- \"Surely you must admit this…\": you = reader."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "text": "- \"…none of you would find any oddity.\": you = audience."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "text": "- \"Ought we ever not to believe…\": generic we."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "text": "- \"And can we then keep the notion…\": generic we."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "text": "- \"Probably you also agree…\": you = reader."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "text": "- \"…if we practically did believe everything…\": generic we."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "text": "- \"Your suspicion here is undoubtedly well founded…\": you = reader."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "text": "- \"…when you pass from the abstract to the concrete…\": generic you."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "text": "- \"But we cannot easily thus restrict our hypotheses.\": generic we."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "text": "- \"But you see already how democratic she is.\": you = reader."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "text": "- \"Her only test… leading us\": generic us."
+    },
+    {
+      "h1": "7 The True Is the Good in the Way of Belief",
+      "text": "- \"…better for us to believe\": generic us."
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+## 2 The Method's Character and Affinities
+
+- [dangling] "But the general triumph of that method would mean an enormous change in the 'temperament' of philosophy.": "the 'temperament' of philosophy": the quotation marks mark a term introduced elsewhere (in the source, "in my last lecture"). No earlier statement in the note says what this "temperament" is.
+
+pass 37 / dangling 1 / outside-frame 0

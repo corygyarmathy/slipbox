@@ -1,0 +1,22 @@
+{"segment": "The Method's Character and Affinities",
+ "changes": [
+  {"note": "Pragmatism Also Means a Theory of Truth", "element": "skeleton", "what": "blank line added between frontmatter and H1", "judgement": "mechanical", "why": "skeleton requires a blank line before the H1"},
+  {"note": "Pragmatism Also Means a Theory of Truth", "element": "_x_", "what": "_TRUTH_", "judgement": "mechanical", "why": "the edition sets this word in caps, which the frame marks as italics"},
+  {"note": "Pragmatism Is a Method Only", "element": "skeleton", "what": "blank line added between frontmatter and H1", "judgement": "mechanical", "why": "skeleton requires a blank line before the H1"},
+  {"note": "Pragmatism Is the Empiricist Attitude in a More Radical Form", "element": "skeleton", "what": "blank line added between frontmatter and H1", "judgement": "mechanical", "why": "skeleton requires a blank line before the H1"},
+  {"note": "Pragmatism Lies Like a Corridor in a Hotel", "element": "skeleton", "what": "blank line added between frontmatter and H1", "judgement": "mechanical", "why": "skeleton requires a blank line before the H1"},
+  {"note": "Solving Names Do Not End the Quest", "element": "skeleton", "what": "blank line added between frontmatter and H1", "judgement": "mechanical", "why": "skeleton requires a blank line before the H1"},
+  {"note": "Solving Names Do Not End the Quest", "element": "_x_", "what": "_PRINCIPLE_ and _CHANGED_", "judgement": "mechanical", "why": "the edition sets these words in caps, which the frame marks as italics"},
+  {"note": "The Method's Character and Affinities", "element": "skeleton", "what": "blank line added between frontmatter and H1", "judgement": "mechanical", "why": "skeleton requires a blank line before the H1"},
+  {"note": "The Pragmatic Method Is an Attitude of Orientation", "element": "skeleton", "what": "blank line added between frontmatter and H1", "judgement": "mechanical", "why": "skeleton requires a blank line before the H1"},
+  {"note": "The Pragmatic Method Is an Attitude of Orientation", "element": "_x_", "what": "the all-caps sentence wrapped in _..._", "judgement": "mechanical", "why": "the edition sets this passage in caps, which the frame marks as italics"},
+  {"note": "Theories Become Instruments, Not Answers to Enigmas", "element": "skeleton", "what": "blank line added between frontmatter and H1", "judgement": "mechanical", "why": "skeleton requires a blank line before the H1"},
+  {"note": "Theories Become Instruments, Not Answers to Enigmas", "element": "_x_", "what": "_THEORIES THUS BECOME ... REST._ and _ANTI-INTELLECTUALIST_", "judgement": "mechanical", "why": "the edition sets these in caps, which the frame marks as italics"}
+ ],
+ "unchanged_notes": ["Pragmatism Is a Method Only", "Pragmatism Is the Empiricist Attitude in a More Radical Form", "Pragmatism Lies Like a Corridor in a Hotel", "The Method's Character and Affinities"],
+ "hard_calls": [
+  "Stage 2 text departs from the source in several places; stage 3 cannot correct these, so they are flagged for stage 2: 'as it seems to me' is dropped from the Empiricist Attitude note; 'it' is replaced by 'pragmatism' in the Method Only note and the Corridor note; the clause 'much as the courtier type is frozen out in republics...' is cut from the Method Only note; 'in what I called in my last lecture' is cut from the same note; and 'So' is dropped from the start of the Solving Names note.",
+  "The hub's numbered list is kept. The order follows the lecture's own sequence, and a bullet list would need a colon lead-in that is not in the source, which would be a text change.",
+  "The sentence 'is what the pragmatic method means' in the Attitude of Orientation note defines the method, but the source names no rule, so no [!Info] callout is added (a callout title must come from the source).",
+  "The three 'with nominalism / utilitarianism / positivism' clauses in the Theories note are running prose, not an enumeration the source counts, so they are not made into a list."
+ ]}

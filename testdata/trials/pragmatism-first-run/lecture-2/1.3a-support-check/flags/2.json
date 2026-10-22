@@ -1,0 +1,230 @@
+{
+  "flags": [
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "Pragmatism represents a perfectly familiar attitude…",
+      "reason": "the opening is fine, but \"it represents it\" is split across two footnotes; reads OK. Pass on reference. (No fault; disregard.)"
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "He turns away from abstraction…",
+      "reason": "\"He\" resolves to \"A pragmatist\" in the preceding statement. Pass, not dangling."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "That means the empiricist temper regnant…",
+      "reason": "\"That\" refers to the turning away and toward just described. Pass, not dangling."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "It means the open air and possibilities of nature…",
+      "reason": "\"It\" refers to the pragmatist stance. Pass."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "At the same time it does not stand for any special results.",
+      "reason": "\"it\" has no clear antecedent, since the previous statement is about the \"empiricist temper\" and \"It means the open air\" and the note never says it is the pragmatic method. Dangling, but weakly resolvable to \"Pragmatism\" in the first statement."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "cut lost content"
+      ],
+      "statement": "But the general triumph of that method would mean an enormous change in the 'temperament' of philosophy.",
+      "reason": "the trimmed words \"what I called in my last lecture\" carry only the author's framing and a pointer outside the lecture. This is a cut of the author's framing and is fine. Pass on cuts. The two-quote split reads fine."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "cut lost content"
+      ],
+      "statement": "Teachers of the ultra-rationalistic type would be frozen out.",
+      "reason": "the source continues \"much as the courtier type is frozen out in republics, as the ultramontane type of priest is frozen out in protestant lands\", which is an illustration only. Pass."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "Metaphysics has usually followed a very primitive kind of quest.",
+      "reason": "pass. \"The universe has always appeared…\" is a cut from \"So the universe…\"; the dropped \"So\" linked to the Solomon/magic illustration, a story tie. Pass."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "That word names the universe's PRINCIPLE…",
+      "reason": "\"That word\" points back to \"word or name\" in the previous statement. Pass."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "You can rest when you have them.",
+      "reason": "\"them\" refers to the solving names in the previous statement. Pass."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "But if you follow the pragmatic method, you cannot look on any such word…",
+      "reason": "\"any such word\" resolves to the solving names. Pass."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "It appears less as a solution, then…",
+      "reason": "\"It\" refers to \"each word\" in the previous statement. Pass."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "We don't lie back upon them…",
+      "reason": "\"them\" refers to theories in the previous statement. Pass."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "Being nothing essentially new, it harmonizes…",
+      "reason": "\"it\" refers to Pragmatism in the previous statement. Pass."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "All these, you see, are ANTI-INTELLECTUALIST tendencies.",
+      "reason": "\"All these\" refers to nominalism, utilitarianism and positivism. Pass."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "But, at the outset, at least, it stands for no particular results.",
+      "reason": "\"it\" is pragmatism, named in the previous statement. Pass."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "Innumerable chambers open out of it.",
+      "reason": "\"it\" is the corridor from the previous statement. Pass."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "In one you may find…",
+      "reason": "\"In one\" refers to the chambers. Pass."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "dangling"
+      ],
+      "statement": "Meanwhile the word pragmatism has come to be used in a still wider sense…",
+      "reason": "the source continues the earlier sentence \"Meanwhile\" after the promise to explain the method; \"Meanwhile\" is a connective tied to the preceding \"I shall presently explain it\", which the note drops. Reads alone as a mild flag: the \"still wider sense\" implies a narrower sense, which was described earlier in the note. Pass."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "file": "2 The Method's Character and Affinities.md",
+      "grades": [
+        "weak"
+      ],
+      "statement": "Teachers of the ultra-rationalistic type would be frozen out.",
+      "reason": "the quote supports it, but the condition (\"the general triumph of that method\") is carried by the preceding statement, so it is fine. Pass on support."
+    }
+  ],
+  "other": [
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "text": "Counts: pass 38 / weak 0 / fail 0 / dangling 1 / outside-frame 0"
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "text": "Cross-section footnotes: none."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "text": "Generic \"we\"/\"you\":"
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "text": "- \"We don't lie back upon them, we move forward…\": generic \"we\" (people in general)."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "text": "- \"THEORIES THUS BECOME INSTRUMENTS… IN WHICH WE CAN REST.\": generic \"we\"."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "text": "- \"You can rest when you have them.\": generic \"you\"."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "text": "- \"You are at the end of your metaphysical quest.\": generic \"you\"."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "text": "- \"But if you follow the pragmatic method…\": generic \"you\"."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "text": "- \"You must bring out of each word…\": generic \"you\"."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "text": "- \"All these, you see, are ANTI-INTELLECTUALIST tendencies.\": \"you\" addressed to the reader."
+    },
+    {
+      "h1": "2 The Method's Character and Affinities",
+      "text": "- \"In one you may find a man writing…\": generic \"you\"."
+    }
+  ]
+}

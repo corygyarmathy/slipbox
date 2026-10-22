@@ -1,0 +1,44 @@
+# Run report: Pragmatism - Lecture II - What Pragmatism Means
+
+What s2n added, dropped and still flags in stage 1, and the segments that fell back in stages 2 and 3. Notes are named as stage 1 left them.
+
+## Losses added
+
+- Loss 0.1: A dispute can be settled by distinguishing the different practical senses of the contested term, so that both parties are right in one sense and wrong in the other
+
+## Statements that still fail
+
+- 2 The Method's Character and Affinities: But the general triumph of that method would mean an enormous change in[^12] the 'temperament' of philosophy.[^13] (1.3a cut lost content: the source reads "in what I called in my last lecture the 'temperament' of philosophy." The trimmed words are only the author's own back-reference, so the cut is acceptable. The quoted "temperament" is left unexplained, but nothing argumentative is lost.; 1.3b dangling: "the 'temperament' of philosophy": the quotation marks mark a term introduced elsewhere (in the source, "in my last lecture"). No earlier statement in the note says what this "temperament" is.)
+- 2 The Method's Character and Affinities: The universe has always appeared to the natural mind as a kind of enigma, of which the key must be sought in the shape of some illuminating or power-bringing word or name.[^17] (1.3a cut lost content: the source begins "So the universe…", and the dropped "So" tied the claim to the preceding Solomon and magic illustration. That is a story tie, and it is a minor cut.)
+- 4 The Formation of New Beliefs: Failure to take account of[^19] the part played by the older truths[^20] is the source of much of the unjust criticism leveled against pragmatism.[^21] (1.3a weak: Support is fine, since it is stitched from adjacent trimmed spans. The "is" join is original. Pass on support.)
+- 4 The Formation of New Beliefs: It must both lean on old truth and grasp new fact; and its success[^30] in doing this, is a matter for the individual's appreciation.[^31] (1.3a cut lost content: The quote's "(as I said a moment ago)" is trimmed. That is only a pointer, so the cut is fine. "its" refers to the new opinion in the prior statement, which is acceptable.)
+- 4 The Formation of New Beliefs: The trail of the human serpent is thus over everything.[^42] (1.3b dangling: "the human serpent": no earlier statement in the note introduces a serpent or says what it stands for, so the definite description is used as if already known.)
+- 5 Rationalistic Criticisms: A hailstorm of contempt and ridicule[^4] throws so much sidelight upon that rationalistic temper to which I, William James,[^5] have opposed the temper of pragmatism.[^6] (1.3a reworded: the source subject is "I should not mention this, but for the fact that it throws…", where "it" is the fact that they were treated with contempt. The note makes the hailstorm itself the subject, and it drops the "I should not mention this, but for the fact" framing. Support is weak: the quote "throws so much sidelight" is attached to a repeated phrase.)
+- 5 Rationalistic Criticisms: It must be an absolute correspondence of our thoughts with an equally absolute reality.[^13] (1.3a weak: these are the typical intellectualist's views in James's voice, but the note gives no attribution, so they read as the note's own claims. Support is weak on how they read.)
+- 5 Rationalistic Criticisms: It must be what we OUGHT to think, unconditionally.[^14] (1.3a weak: these are the typical intellectualist's views in James's voice, but the note gives no attribution, so they read as the note's own claims. Support is weak on how they read.)
+- 5 Rationalistic Criticisms: The conditioned ways in which we DO think are so much irrelevance and matter for psychology.[^15] (1.3a weak: these are the typical intellectualist's views in James's voice, but the note gives no attribution, so they read as the note's own claims. Support is weak on how they read.)
+- 5 Rationalistic Criticisms: Down with psychology, up with logic, in all this question![^16] (1.3a weak: these are the typical intellectualist's views in James's voice, but the note gives no attribution, so they read as the note's own claims. Support is weak on how they read.)
+- 5 Rationalistic Criticisms: He accuses us,[^21] Messrs.[^22] (1.3a cut lost content: the source says "He accuses us of DENYING truth", where "us" means James and the pragmatists. The note splices a name span so "us" appears to equal Dewey, Schiller and allies. That is a change of referent. See name span below.)
+- 5 Rationalistic Criticisms: Pragmatism[^26] only follows[^27] the example of the sister-sciences, interpreting the unobserved by the observed.[^28] (1.3b dangling: "the sister-sciences": no earlier statement in the note says which sciences these are or what they are sisters of.)
+- 5 Rationalistic Criticisms: It brings old and new harmoniously together.[^29] (1.3b dangling: "old and new": the statement doesn't say old and new what, and nothing earlier in the note supplies it.)
+- 5 Rationalistic Criticisms: It converts the absolutely empty notion of a static relation of 'correspondence'[^30] between our minds and reality, into that of a rich and active commerce (that anyone may follow in detail and understand) between particular thoughts of ours, and the great universe of other experiences in which they play their parts and have their uses.[^31] (1.3a cut lost content: the cut drops the parenthetical "(what that may mean we must ask later)"; it carries only the author's stance and a pointer, so no content lost. Pass.)
+- 5 Rationalistic Criticisms: no statement matched the checker's quote `…to which I, William James, have opposed…` (1.3a reads wrong: the author name span "William James" is inserted mid-sentence in apposition to "I". A cut of the "I" would work, e.g. "…the rationalistic temper to which pragmatism is opposed", or the quote could be left as "I" with an earlier statement naming James. Grade: cut would do.)
+- 6 Pragmatism as Mediator Between Empiricism and Religion: Pragmatism may be a happy harmonizer of empiricist ways of thinking, with the more religious demands of human beings.[^1] (1.3a weak: The quote is lowercase "pragmatism may be…" from "the claim I made… that pragmatism may be…". The statement drops the "claim" framing but is supported as a hedged claim.)
+- 6 Pragmatism as Mediator Between Empiricism and Religion: It is eminently a product of[^17] the rationalistic temper.[^18] (1.3a cut lost content: Spliced from "what I have ventured to call the rationalistic temper". The trimmed words are the author's framing only, so this passes. The splice itself is fine.; 1.3b dangling: "the rationalistic temper": the note uses it as an already-introduced term, but no earlier statement in the note says what this temper is.)
+- 6 Pragmatism as Mediator Between Empiricism and Religion: To answer, we need only apply the pragmatic method.[^37] (1.3b dangling: "the pragmatic method": the note never says what the pragmatic method is.)
+- 0 What Pragmatism Means: The corpus of[^7] a ferocious metaphysical dispute[^8] was a squirrel--a live squirrel supposed to be clinging to one side of a tree-trunk; while over against the tree's opposite side a human being was imagined to stand.[^9] (1.3a cut lost content: the quotes are stitched from two source locations ("The corpus of" + "a ferocious metaphysical dispute"). Between them the source reads "The corpus of the dispute was a squirrel", and "ferocious metaphysical" actually comes from the prior sentence. The statement reads like a clean sentence, but the joined quote is a spliced rewrite.; 1.3a reworded: "the dispute" is rewritten as "a ferocious metaphysical dispute" using words from a different source sentence, which is a reword rather than a trim.)
+- 0 What Pragmatism Means: This human witness tries to get sight of the squirrel by moving rapidly round the tree, but no matter how fast he goes, the squirrel moves as fast in the opposite direction, and always keeps the tree between himself and the man, so that never a glimpse of him is caught.[^10] (1.3a weak: "This human witness" refers to the human being in the preceding statement. It resolves, so it passes. Support is fine.)
+- 0 What Pragmatism Means: Which party is right[^12] depends on what you PRACTICALLY MEAN by 'going round' the squirrel.[^13] (1.3a cut lost content: the trimmed words are the speaker's framing ('"Which party is right," I said, "'). Only stance was dropped, so this passes on cuts.)
+
+## Dropped
+
+None.
+
+## Fallbacks
+
+None.
+
+## Asides and name spans
+
+- Asides: 0
+- Name spans that point outside their segment, author name spans included: 7, in 1 History of the Method (1), 5 Rationalistic Criticisms (2), 6 Pragmatism as Mediator Between Empiricism and Religion (1), 7 The True Is the Good in the Way of Belief (3)

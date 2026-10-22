@@ -1,0 +1,120 @@
+=== FILE: A New Idea Is Grafted Upon the Ancient Stock of Opinions.md ===
+---
+aliases: []
+tags: []
+---
+
+# A New Idea Is Grafted Upon the Ancient Stock of Opinions[^1]
+
+The observable process which Schiller and Dewey particularly singled out for generalization is the familiar one by which any individual settles into _NEW OPINIONS_. The process here is always the same. The individual has a stock of old opinions already, but he meets a new experience that puts them to a strain. Somebody contradicts them; or in a reflective moment he discovers that they contradict each other; or he hears of facts with which they are incompatible; or desires arise in him which they cease to satisfy. The result is an inward trouble to which his mind till then had been a stranger, and from which he seeks to escape by modifying his previous mass of opinions. He saves as much of it as he can, for in this matter of belief we are all extreme conservatives. So he tries to change first this opinion, and then that (for they resist change very variously), until at last some new idea comes up which he can graft upon the ancient stock with a minimum of disturbance of the latter, some idea that mediates between the stock and the new experience and runs them into one another most felicitously and expediently.
+
+This new idea is then adopted as the true one. It preserves the older stock of truths with a minimum of modification, stretching them just enough to make them admit the novelty, but conceiving that in ways as familiar as the case leaves possible. An outree explanation, violating all our preconceptions, would never pass for a true account of a novelty. We should scratch round industriously till we found something less excentric. The most violent revolutions in an individual's beliefs leave most of his old order standing.
+
+[^1]: [[@Pragmatism - William James]]
+
+=== FILE: A New Opinion Is True as It Satisfies Our Double Urgency.md ===
+---
+aliases: []
+tags: []
+---
+
+# A New Opinion Is True as It Satisfies Our Double Urgency[^1]
+
+A new opinion counts as 'true' just in proportion as it gratifies the individual's desire to assimilate the novel in his experience to his beliefs in stock. It must both lean on old truth and grasp new fact; and its success in doing this, is a matter for the individual's appreciation. When old truth grows, then, by new truth's addition, it is for subjective reasons. We are in the process and obey the reasons. That new idea is truest which performs most felicitously its function of satisfying our double urgency. It makes itself true, gets itself classed as true, by the way it works; grafting itself then upon the ancient body of truth, which thus grows much as a tree grows by the activity of a new layer of cambium.
+
+[^1]: [[@Pragmatism - William James]]
+
+=== FILE: Loyalty to the Older Truths Is the First Principle.md ===
+---
+aliases: []
+tags: []
+---
+
+# Loyalty to the Older Truths Is the First Principle[^1]
+
+Failure to take account of the part played by the older truths is the source of much of the unjust criticism leveled against pragmatism. Their influence is absolutely controlling. Loyalty to them is the first principle--in most cases it is the only principle; for by far the most usual way of handling phenomena so novel that they would make for a serious rearrangement of our preconceptions is to ignore them altogether, or to abuse those who bear witness for them.
+
+[^1]: [[@Pragmatism - William James]]
+
+=== FILE: New Truth Is a Go-Between.md ===
+---
+aliases: []
+tags: []
+---
+
+# New Truth Is a Go-Between[^1]
+
+New truth is always a go-between, a smoother-over of transitions. It marries old opinion to new fact so as ever to show a minimum of jolt, a maximum of continuity. We hold a theory true just in proportion to its success in solving this 'problem of maxima and minima.' But success in solving this problem is eminently a matter of approximation. We say this theory solves it on the whole more satisfactorily than that theory; but that means more satisfactorily to ourselves, and individuals will emphasize their points of satisfaction differently. To a certain degree, therefore, everything here is plastic.
+
+[^1]: [[@Pragmatism - William James]]
+
+=== FILE: Pragmatism Is a Method and a Genetic Theory of Truth.md ===
+---
+aliases: []
+tags: []
+---
+
+# Pragmatism Is a Method and a Genetic Theory of Truth[^1]
+
+Mr. Schiller still gives to all this view of truth the name of 'Humanism,' but, for this doctrine too, the name of pragmatism seems fairly to be in the ascendant. Such then would be the scope of pragmatism--first, a method; and second, a genetic theory of what is meant by truth.
+
+[^1]: [[@Pragmatism - William James]]
+
+=== FILE: Purely Objective Truth Is Nowhere to Be Found.md ===
+---
+aliases: []
+tags: []
+---
+
+# Purely Objective Truth Is Nowhere to Be Found[^1]
+
+Now Dewey and Schiller proceed to generalize this observation and to apply it to the most ancient parts of truth. They also once were plastic. They also were called true for human reasons. They also mediated between still earlier truths and what in those days were novel observations. Purely objective truth, truth in whose establishment the function of giving human satisfaction in marrying previous parts of experience with newer parts played no role whatever, is nowhere to be found. The reasons why we call things true is the reason why they _ARE_ true, for 'to be true' _MEANS_ only to perform this marriage-function.
+
+[^1]: [[@Pragmatism - William James]]
+
+=== FILE: The Formation of New Beliefs.md ===
+---
+aliases: []
+tags: []
+---
+
+# The Formation of New Beliefs
+
+1. [[A New Idea Is Grafted Upon the Ancient Stock of Opinions]]
+2. [[New Truth Is a Go-Between]]
+3. [[Loyalty to the Older Truths Is the First Principle]]
+4. [[The Simplest Case of New Truth Is Mere Addition]]
+5. [[A New Opinion Is True as It Satisfies Our Double Urgency]]
+6. [[Purely Objective Truth Is Nowhere to Be Found]]
+7. [[The Trail of the Human Serpent Is Over Everything]]
+8. [[Pragmatism Is a Method and a Genetic Theory of Truth]]
+
+=== FILE: The Simplest Case of New Truth Is Mere Addition.md ===
+---
+aliases: []
+tags: []
+---
+
+# The Simplest Case of New Truth Is Mere Addition[^1]
+
+The simplest case of new truth is of course the mere numerical addition of new kinds of facts, or of new single facts of old kinds, to our experience--an addition that involves no alteration in the old beliefs. Day follows day, and its contents are simply added. The new contents themselves are not true, they simply _COME_ and _ARE_. Truth is what we say about them, and when we say that they have come, truth is satisfied by the plain additive formula. But often the day's contents oblige a rearrangement.
+
+[^1]: [[@Pragmatism - William James]]
+
+=== FILE: The Trail of the Human Serpent Is Over Everything.md ===
+---
+aliases: []
+tags: []
+---
+
+# The Trail of the Human Serpent Is Over Everything[^1]
+
+The trail of the human serpent is thus over everything. Truth independent; truth that we _FIND_ merely; truth no longer malleable to human need; truth incorrigible, in a word; such truth exists indeed superabundantly--or is supposed to exist by rationalistically minded thinkers; but then it means only the dead heart of the living tree, and its being there means only that truth also has its paleontology and its 'prescription,' and may grow stiff with years of veteran service and petrified in men's regard by sheer antiquity. But how plastic even the oldest truths nevertheless really are has been vividly shown in our day by the transformation of logical and mathematical ideas, a transformation which seems even to be invading physics. The ancient formulas are reinterpreted as special expressions of much wider principles, principles that our ancestors never got a glimpse of in their present shape and formulation.
+
+[^1]: [[@Pragmatism - William James]]
+
+=== MANIFEST ===
+{"segment": "The Formation of New Beliefs",
+ "changes": [{"note": "A New Idea Is Grafted Upon the Ancient Stock of Opinions", "element": "_x_", "what": "wrapped 'NEW OPINIONS' in _ _ as the edition's italic caps", "judgement": "mechanical", "why": "frame locator says CAPS mark the edition's italics; the source emphasises here"}, {"note": "Purely Objective Truth Is Nowhere to Be Found", "element": "_x_", "what": "wrapped 'ARE' and 'MEANS' in _ _", "judgement": "mechanical", "why": "frame locator says CAPS mark the edition's italics; the source emphasises these words"}, {"note": "The Trail of the Human Serpent Is Over Everything", "element": "_x_", "what": "wrapped 'FIND' in _ _", "judgement": "mechanical", "why": "frame locator says CAPS mark the edition's italics; the source emphasises this word"}, {"note": "The Simplest Case of New Truth Is Mere Addition", "element": "_x_", "what": "wrapped 'COME' and 'ARE' in _ _", "judgement": "mechanical", "why": "frame locator says CAPS mark the edition's italics; the source emphasises these words"}],
+ "unchanged_notes": ["A New Opinion Is True as It Satisfies Our Double Urgency", "Loyalty to the Older Truths Is the First Principle", "New Truth Is a Go-Between", "Pragmatism Is a Method and a Genetic Theory of Truth", "The Formation of New Beliefs"],
+ "hard_calls": []}

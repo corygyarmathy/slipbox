@@ -1,0 +1,9 @@
+{"segment": "What Pragmatism Means",
+ "changes": [{"note": "Does the Man Go Round the Squirrel", "element": "[!Example]", "what": "body wrapped in an untitled Example callout", "judgement": "judgement", "why": "the body is the squirrel anecdote, which the source gives as an example"},
+ {"note": "Does the Man Go Round the Squirrel", "element": "_x_", "what": "'DOES THE MAN GO ROUND THE SQUIRREL OR NOT?' and 'PRACTICALLY MEAN' italicised", "judgement": "mechanical", "why": "the frame locators say CAPS mark the edition's italics"},
+ {"note": "The Pragmatic Method Settles Metaphysical Disputes", "element": "[!Info]", "what": "paragraph wrapped in an untitled Info callout", "judgement": "judgement", "why": "the paragraph sets out the method as a principle"},
+ {"note": "The Pragmatic Method Settles Metaphysical Disputes", "element": "**x**", "what": "'pragmatic method' bolded where the sentence defines it", "judgement": "judgement", "why": "the term is defined in its opening sentence"}],
+ "unchanged_notes": ["What Pragmatism Means"],
+ "hard_calls": ["The [!Info] callout has no title because the source names no rule for this passage, and a title may not be invented.",
+ "CAPS in the squirrel passage are read as the edition's italics, per the frame locators, so they are wrapped in _x_ without recasing.",
+ "The hub's numbered list is kept as stage 2 set it, since its order is the lecture's order and the hub's links must not change."]}

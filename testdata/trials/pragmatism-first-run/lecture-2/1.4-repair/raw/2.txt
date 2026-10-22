@@ -1,0 +1,10 @@
+```
+=== EDIT: 2 The Method's Character and Affinities.md ===
+--- REPLACE ---
+At the same time it does not stand for any special results.[^8]
+--- WITH ---
+At the same time{} pragmatism{} does not stand for any special results.
+=== REPORT ===
+- "At the same time it does not stand for any special results.": dangling flag (support and cuts check). Fixed with a name span. The note's previous two statements ("That means the empiricist temper regnant…", "It means the open air…") are about the pragmatist's turning, so "it" here has no clear referent. I replaced "it" with the name span "pragmatism", which is in the frame and in this segment ("pragmatism is fully armed and militant"). The statement is now two quotes from the segment around that span, with `{}` between them. The following "It is a method only." now resolves to pragmatism.
+- Every other entry in the support and cuts check is marked pass, so I made no other edits. The mechanical and reads-alone checks raised no flags.
+```

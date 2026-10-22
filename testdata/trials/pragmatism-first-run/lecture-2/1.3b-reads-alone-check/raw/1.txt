@@ -1,0 +1,5 @@
+# 1 History of the Method
+
+- [dangling] "There is absolutely nothing new in the pragmatic method.": "the pragmatic method": the note has only introduced "pragmatism", "the principle of pragmatism" and a "test of tracing a concrete consequence". It never introduces a "method", so the definite description has no antecedent. The "it"/"its" in the next statements (Socrates, Aristotle, Locke and the rest) depend on this term.
+
+pass 27 / dangling 1 / outside-frame 0
