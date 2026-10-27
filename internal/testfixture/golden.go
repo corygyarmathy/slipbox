@@ -11,9 +11,11 @@ import (
 	"testing"
 )
 
-// update is the -update flag: `go test ./... -update` rewrites each golden
-// file with what its test got. It is declared here, once, so every package
-// whose tests import testfixture takes it.
+// update is the -update flag: `go test ./internal/<pkg> -update` rewrites
+// each of that package's golden files with what its test got. It is
+// declared here, once, so every package whose tests import testfixture
+// takes it. A package whose tests don't import it rejects the flag, so
+// `go test ./... -update` fails there: name the packages instead.
 var update = flag.Bool("update", false, "rewrite golden files under testdata/ with what the tests got")
 
 // Golden checks got against the golden file name, a slash-separated path

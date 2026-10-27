@@ -15,10 +15,11 @@
 //     its first segment's call alone and the rest in parallel, so the order
 //     calls arrive in isn't fixed.
 //   - Golden checks deterministic output against a golden file under the
-//     calling package's testdata/. `go test -update` rewrites the files
-//     instead, and their diff is reviewed in the pull request. The -update
-//     flag is declared here, so every package whose tests import
-//     testfixture takes it.
+//     calling package's testdata/. `go test ./internal/<pkg> -update`
+//     rewrites that package's files instead, and their diff is reviewed in
+//     the pull request. The -update flag is declared here, so only the
+//     packages whose tests import testfixture take it: run it on those
+//     packages, as `go test ./... -update` fails in the rest.
 //
 // [ADR 0002]: https://github.com/corygyarmathy/slipbox/blob/main/docs/adr/0002-one-note-model-run-folder-and-replies-tested-as-text.md
 package testfixture
