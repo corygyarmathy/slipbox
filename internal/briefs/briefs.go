@@ -1,7 +1,9 @@
 // Package briefs embeds the trialled system prompts where they are, so the
 // bytes sent to the model are these files themselves, with no copy to drift
 // (ADR 0002 §7). A brief stays as it was last trialled, and the maintainer
-// decides when a change to one is worth a re-trial.
+// decides when a change to one is worth a re-trial. A change made without one
+// is noted in that brief's doc below, as a brief not yet trialled says what
+// its trial will be, so the docs show which bytes no trial has run.
 //
 // The first seven are the trial files of personal-notes' prototype/cheaper-tier
 // branch (commit dd6d3939), renamed: stage-1.md was RULES.md,
