@@ -95,7 +95,7 @@ what fell back. Choosing what to keep is stage 4.
 ### The run folder
 
 Each run has a **run folder** outside the vault, which is the only channel
-between steps ([ADR 0002](adr/0002-one-note-model-run-folder-and-fixture-tree.md)).
+between steps ([ADR 0002](adr/0002-one-note-model-run-folder-and-replies-tested-as-text.md)).
 Each step writes only its own directory, and a complete directory means a
 finished step. `s2n resume` picks up at the first step that isn't complete,
 and reuses the segments that step had already finished. Package `run`
@@ -109,14 +109,19 @@ staged.
 - **Gates are functions** (`gate`). A check takes parsed notes and returns a
   report, and its tests say what it does.
 - **One model-step runner** (`modelstep`) over **one provider seam**
-  (`provider`). The seam has a `claude -p` adapter for real runs and a replay
-  adapter for tests, so tests never call a model.
+  (`provider`). The seam has a `claude -p` adapter for real runs and a fake
+  for tests that serves the replies the test supplies, so tests never call a
+  model.
 - **The briefs** (`internal/briefs`) are the files as last trialled, embedded
   byte for byte. The maintainer decides when a change to one is worth a
   re-trial.
-- **Fixtures** live under `testdata/`: a public-domain chapter in `sources/`,
-  and its recorded run, copied whole with its provenance, and hand-written
-  replies in `trials/`.
+- **Tests check replies as text** ([ADR 0002](adr/0002-one-note-model-run-folder-and-replies-tested-as-text.md)
+  §8). Request building is tested by targeted assertions, reply handling on
+  each step's reply cases, deterministic output on golden files under
+  `testdata/`, and orchestration end to end on short invented replies. A
+  trial is an eval the maintainer runs, whose report is read, not asserted
+  on. `testdata/sources/` holds a public-domain chapter. The recorded run on
+  it in `testdata/trials/` stays only until the tests are migrated off it.
 
 ## Out of scope
 
