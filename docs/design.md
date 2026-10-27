@@ -111,8 +111,9 @@ staged.
 - **One model-step runner** (`modelstep`) over **one provider seam**
   (`provider`). The seam has a `claude -p` adapter for real runs and a replay
   adapter for tests, so tests never call a model.
-- **The briefs** (`internal/briefs`) are the trialled files, embedded byte for
-  byte. Changing one needs a re-trial.
+- **The briefs** (`internal/briefs`) are the files as last trialled, embedded
+  byte for byte. The maintainer decides when a change to one is worth a
+  re-trial.
 - **Fixtures** live under `testdata/`: a public-domain chapter in `sources/`,
   and its recorded run, copied whole with its provenance, and hand-written
   replies in `trials/`.

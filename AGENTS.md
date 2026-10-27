@@ -10,7 +10,8 @@ the standard library (ADR 0001).
   the unattended run and the run folder. Each step's package doc holds its
   detail.
 - [`internal/briefs/`](internal/briefs/) - the system prompts, verbatim as
-  trialled. Change them only with a re-trial.
+  last trialled. The maintainer decides when a change to one is worth a
+  re-trial.
 - [`GLOSSARY.md`](GLOSSARY.md) - the vocabulary.
 - [`docs/adr/`](docs/adr/) - the decisions, and the reasoning behind them.
 - [`testdata/sources/`](testdata/sources/) - Pragmatism Lecture II, a
