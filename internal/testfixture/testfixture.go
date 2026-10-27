@@ -1,7 +1,26 @@
-// Package testfixture is the one way tests open fixtures (ADR 0002 §8): the
-// public-domain chapter (Pragmatism) in testdata/sources/ and its recorded
-// run, the hand-written replies in testdata/trials/hand-written/, and an
-// invented chapter with its stage 1 notes and split (lamp.go).
+// Package testfixture is the one way tests open fixtures
+// ([ADR 0002] §8): the public-domain chapter (Pragmatism) in
+// testdata/sources/ and its recorded run, the hand-written replies in
+// testdata/trials/hand-written/, an invented chapter with its stage 1 notes
+// and split (lamp.go), and golden files.
+//
+// It also holds the two helpers tests use to check replies as text (fake.go,
+// golden.go):
+//
+//   - Fake is the provider a test reaches the seam through. The test
+//     supplies a function that decides each reply, and asserts on the
+//     requests the Fake records. Serve builds one from reply cases matched
+//     on a piece of the user prompt, so a test doesn't depend on how the
+//     whole prompt is laid out. Neither serves by call order: a step makes
+//     its first segment's call alone and the rest in parallel, so the order
+//     calls arrive in isn't fixed.
+//   - Golden checks deterministic output against a golden file under the
+//     calling package's testdata/. `go test -update` rewrites the files
+//     instead, and their diff is reviewed in the pull request. The -update
+//     flag is declared here, so every package whose tests import
+//     testfixture takes it.
+//
+// [ADR 0002]: https://github.com/corygyarmathy/slipbox/blob/main/docs/adr/0002-one-note-model-run-folder-and-replies-tested-as-text.md
 package testfixture
 
 import (
