@@ -16,8 +16,8 @@ the standard library (ADR 0001).
 - [`docs/adr/`](docs/adr/) - the decisions, and the reasoning behind them.
 - [`testdata/sources/`](testdata/sources/) - Pragmatism Lecture II, a
   public-domain chapter.
-- `testdata/trials/` - its recorded run, and hand-written replies for the
-  cases it doesn't reach (ADR 0002 §8).
+- `testdata/trials/` - the recorded run the tests are being migrated off,
+  and hand-written replies. It's deleted once no test opens it (ADR 0002 §8).
 - The private archive,
   [`corygyarmathy/source-to-notes`](https://github.com/corygyarmathy/source-to-notes)
   (private), holds the trials behind the ADRs: their chapters and outputs, the
@@ -30,15 +30,20 @@ the standard library (ADR 0001).
   under `_Avoid_`.
 - `gofmt` is the formatter of record. Run it before you commit.
 - Tests run offline and never call a model. They reach the provider seam
-  through a fake that replays recorded replies (ADR 0001 §7).
+  through a fake that serves the replies the test supplies (ADR 0001 §7).
 - Do not add a dependency. The answer is usually the standard library, and a
   dependency is an ADR-sized decision.
 - A check's tests say what it does (ADR 0001 §4). A change to what a check
   does updates its tests, and says why in its package doc. Write code in
   idiomatic Go.
-- Trial outputs live in one fixture tree, `testdata/trials/`, each trial run
-  copied whole with its provenance (ADR 0002 §8). Copy in a trial run only
-  when a test needs what it holds.
+- Test what the code does with a reply, not that it reproduces a recorded run
+  (ADR 0002 §8). Assert on the parts of a request that matter. Test reply
+  handling on small reply cases in the step's test: one well-formed reply,
+  then one per known deviation, each saying what it covers. Test
+  deterministic output on golden files under `testdata/`, regenerated with
+  `-update`. Keep end-to-end tests to orchestration, on short invented
+  replies. A trial is an eval the maintainer runs, not a fixture: don't copy
+  one in for a test to assert against.
 - Write the reason into the comment, package doc or ADR. Don't point to an
   issue or PR in its place: an ADR may cite one as evidence, but needing to
   cite one elsewhere means documentation is missing.

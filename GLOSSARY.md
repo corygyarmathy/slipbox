@@ -124,6 +124,14 @@ _Avoid_: drop (a dropped item is gone), skip
 The system prompt a model step runs with, kept as it was last trialled; the maintainer decides when a change is worth a re-trial.
 _Avoid_: prompt, instructions
 
+**Trial**:
+A real run the maintainer chooses to make, to see how the procedure or a brief does on a source; an eval that produces a report to read, never a fixture a test asserts against.
+_Avoid_: experiment, benchmark
+
+**Reply case**:
+A small, named model reply written in a step's test, one well-formed or one per known deviation, saying what it covers; invented, or trimmed from a run on a public-domain source. A deviation a real run turns up is added as a new minimal case.
+_Avoid_: recorded reply, canned reply
+
 **Text rule**:
 How s2n reads a source's characters, the same in every step: what counts as whitespace, a digit, a letter or a word character, all by Unicode, so a no-break space is whitespace and ē a letter; and text is cut by code point, not byte.
 _Avoid_: pystr, string semantics
