@@ -4,222 +4,193 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"reflect"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/corygyarmathy/slipbox/internal/checker"
-	"github.com/corygyarmathy/slipbox/internal/note"
 	"github.com/corygyarmathy/slipbox/internal/run"
+	"github.com/corygyarmathy/slipbox/internal/source"
 	"github.com/corygyarmathy/slipbox/internal/supportcheck"
 	"github.com/corygyarmathy/slipbox/internal/testfixture"
 )
 
-// notesBlock is the trialled notes block, transcribed: files maps each
-// note's file name to its file's text.
-func notesBlock(files map[string]string, names []string, label string) string {
-	out := "=== " + label + " ===\n"
-	for _, name := range names {
-		out += "--- NOTE: " + name + " ---\n" + files[name] + "\n"
-	}
-	return out + "=== END " + label + " ===\n\n"
+// TestShared pins the notes block every call shares on the invented
+// chapter's stage 1 notes: every note, the segment's own too, in name order.
+func TestShared(t *testing.T) {
+	testfixture.Golden(t, "shared.txt", supportcheck.Shared(testfixture.LampStage1Notes(t)))
 }
 
-// sharedNotes is the trialled checker's notes moved to the system prompt:
-// every note, the segment's own too, so it is the same for every segment.
-func sharedNotes(files map[string]string) string {
-	var names []string
-	for name := range files {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return notesBlock(files, names, "ALL SEGMENTS' NOTES (check only the notes your segment's list names; the rest are reference only)")
-}
-
-// checkPrompt is what is left of the trialled checker's user prompt: the
-// names of segment n's own notes, which the shared notes give in full.
-func checkPrompt(files map[string]string, n int, heading string) string {
-	var mine []string
-	for name := range files {
-		if strings.HasPrefix(name, strconv.Itoa(n)+" ") {
-			mine = append(mine, name)
-		}
-	}
-	sort.Strings(mine)
-	label := "YOUR SEGMENT'S NOTES TO CHECK (segment " + strconv.Itoa(n) + ": " + heading + ")"
-	return "=== " + label + " ===\n" + strings.Join(mine, "\n") + "\n=== END " + label + " ===\n"
-}
-
-func TestPrompt_MatchesCheck(t *testing.T) {
-	src, folder := testfixture.PragmatismSource(t), testfixture.PragmatismFolder(t, run.ExtractDir)
-	stage1 := filepath.Join(folder.Dir, filepath.FromSlash(run.ExtractNotes))
-	notes, err := note.ReadDir(stage1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	files := testfixture.Files(t, stage1)
-	if len(notes) != len(files) || len(files) != 8 {
-		t.Fatalf("read %d notes from %d files, want 8", len(notes), len(files))
-	}
-	if got, want := supportcheck.Shared(notes), sharedNotes(files); got != want {
-		t.Errorf("shared notes differ from the notes block of every note:\n got %q\nwant %q", got, want)
-	}
-	for _, seg := range src.Segments {
+// TestPrompt pins each segment's user prompt on the invented chapter's stage
+// 1 notes: the names of its own notes, segment 1's aside included, and not
+// their text, which the shared block gives.
+func TestPrompt(t *testing.T) {
+	notes := testfixture.LampStage1Notes(t)
+	for _, seg := range testfixture.LampSource(t).Segments {
 		got := supportcheck.Prompt(notes, seg)
-		if want := checkPrompt(files, seg.Number, seg.Heading); got != want {
-			t.Errorf("%s: prompt differs from the list of the segment's notes:\n got %q\nwant %q", seg, got, want)
-		}
+		testfixture.Golden(t, "prompt/"+strconv.Itoa(seg.Number)+".txt", got)
 		if strings.Contains(got, "--- NOTE: ") {
 			t.Errorf("%s: prompt gives a note again: %q", seg, got)
 		}
 	}
 }
 
-// flagLines counts the lines of report that open with a bullet and a
-// bracketed non-pass grade, the shape a reader would take for a flag.
-func flagLines(report string) int {
-	grades := []string{"weak", "fail", "dangling", "outside-frame", "cut lost content", "reworded",
-		"wrong referent", "not a name span", "cut would do", "reads wrong"}
-	n := 0
-	for _, line := range strings.Split(report, "\n") {
-		for _, g := range grades {
-			if strings.HasPrefix(strings.TrimSpace(line), "- ["+g+"] ") {
-				n++
-			}
-		}
-	}
-	return n
+// replyCase is a segment's reply and the flags Run should parse from it.
+type replyCase struct {
+	segment int
+	reply   string
+	want    checker.Report
 }
 
-// TestRun_ReplaysThePragmatismCheck runs step 1.3a on the Pragmatism run's
-// stage 1 notes with its recorded Sonnet replies.
-func TestRun_ReplaysThePragmatismCheck(t *testing.T) {
-	src, trial, folder := testfixture.PragmatismSource(t), testfixture.PragmatismRun(t), testfixture.PragmatismFolder(t, run.ExtractDir)
-	files := testfixture.Files(t, filepath.Join(folder.Dir, filepath.FromSlash(run.ExtractNotes)))
-	recordedDir := filepath.Join(trial, run.SupportCheckDir)
-	recorded := testfixture.RawReplies(t, recordedDir, len(src.Segments))
-	var prompts []string
-	for _, seg := range src.Segments {
-		prompts = append(prompts, checkPrompt(files, seg.Number, seg.Heading))
+// replyCases are one reply per segment of the invented chapter, each
+// covering a shape of report the step handles.
+var replyCases = []replyCase{
+	// A well-formed report: flags under the note's H1, each given the note's
+	// file, and the counts line kept under it.
+	{0, "# 0 Keepers of the Lamp\n\n" +
+		"- [weak] \"It burns whether or not a ship is near.\": the section says it burns, not that it burns for no ship.\n" +
+		"- [reworded] \"The keeper kept that promise…\": the quote reads \"for the harbour\", which the statement moves.\n" +
+		"pass 1 / weak 1 / fail 0 / dangling 0 / outside-frame 0\n",
+		checker.Report{
+			Flags: []checker.Flag{
+				{H1: "0 Keepers of the Lamp", File: "0 Keepers of the Lamp.md", Grades: []checker.Grade{checker.Weak},
+					Statement: "It burns whether or not a ship is near.", Reason: "the section says it burns, not that it burns for no ship."},
+				{H1: "0 Keepers of the Lamp", File: "0 Keepers of the Lamp.md", Grades: []checker.Grade{checker.Reworded},
+					Statement: "The keeper kept that promise…", Reason: `the quote reads "for the harbour", which the statement moves.`},
+			},
+			Other: []checker.Line{{H1: "0 Keepers of the Lamp", Text: "pass 1 / weak 1 / fail 0 / dangling 0 / outside-frame 0"}},
+		}},
+	// Two statements graded on one line give a flag each. A flag under the
+	// aside's H1 is given the aside's file. An H1 that names none of the
+	// segment's notes, here for a dropped apostrophe, gives its flag no file.
+	{1, "# 1 The Keeper's Watch\n\n" +
+		"- [dangling] \"He trimmed the wick…\" / \"He logged the weather…\": \"He\" has no antecedent in the note.\n\n" +
+		"# 1 The Keeper's Watch - Aside - The log\n\n" +
+		"- [dangling] \"Then they read every page.\": \"they\" has no antecedent in the note.\n\n" +
+		"# 1 The Keepers Watch\n\n" +
+		"- [cut would do] \"The watch began at dusk.\": the whole sentence is quoted where \"at dusk\" would do.\n",
+		checker.Report{
+			Flags: []checker.Flag{
+				{H1: "1 The Keeper's Watch", File: "1 The Keeper's Watch.md", Grades: []checker.Grade{checker.Dangling},
+					Statement: "He trimmed the wick…", Reason: `"He" has no antecedent in the note.`},
+				{H1: "1 The Keeper's Watch", File: "1 The Keeper's Watch.md", Grades: []checker.Grade{checker.Dangling},
+					Statement: "He logged the weather…", Reason: `"He" has no antecedent in the note.`},
+				{H1: "1 The Keeper's Watch - Aside - The log", File: "1 The Keeper's Watch - Aside - The log.md", Grades: []checker.Grade{checker.Dangling},
+					Statement: "Then they read every page.", Reason: `"they" has no antecedent in the note.`},
+				{H1: "1 The Keepers Watch", File: "", Grades: []checker.Grade{checker.CutWouldDo},
+					Statement: "The watch began at dusk.", Reason: `the whole sentence is quoted where "at dusk" would do.`},
+			},
+			Other: []checker.Line{},
+		}},
+	// A report that flags statements, then withdraws the flags. They stand:
+	// a report's withdrawals are the repair call's to read, and the
+	// withdrawal is kept as text.
+	{2, "# 2 The Lens\n\n" +
+		"- [fail] \"Obviously, a keeper can take no notice…\": the section says nothing of the keeper.\n" +
+		"- [outside-frame] \"It uses rings of prisms…\": \"It\" is the Fresnel lens, which only the source names.\n\n" +
+		"Correcting the above: both pass. The first quotes the section word for word, and \"It\" is the lens the note names.\n" +
+		"pass 5 / weak 0 / fail 0 / dangling 0 / outside-frame 0\n",
+		checker.Report{
+			Flags: []checker.Flag{
+				{H1: "2 The Lens", File: "2 The Lens.md", Grades: []checker.Grade{checker.Fail},
+					Statement: "Obviously, a keeper can take no notice…", Reason: "the section says nothing of the keeper."},
+				{H1: "2 The Lens", File: "2 The Lens.md", Grades: []checker.Grade{checker.OutsideFrame},
+					Statement: "It uses rings of prisms…", Reason: `"It" is the Fresnel lens, which only the source names.`},
+			},
+			Other: []checker.Line{
+				{H1: "2 The Lens", Text: `Correcting the above: both pass. The first quotes the section word for word, and "It" is the lens the note names.`},
+				{H1: "2 The Lens", Text: "pass 5 / weak 0 / fail 0 / dangling 0 / outside-frame 0"},
+			},
+		}},
+	// A report with no flag: its flags are an empty list.
+	{3, "# 3 Storms\n\npass 3 / weak 0 / fail 0 / dangling 0 / outside-frame 0\n",
+		checker.Report{
+			Flags: []checker.Flag{},
+			Other: []checker.Line{{H1: "3 Storms", Text: "pass 3 / weak 0 / fail 0 / dangling 0 / outside-frame 0"}},
+		}},
+}
+
+// extractFolder makes a run folder for the invented chapter whose step 1.1
+// wrote its stage 1 notes.
+func extractFolder(t *testing.T) (*source.Source, *run.Folder) {
+	t.Helper()
+	src := testfixture.LampSource(t)
+	folder, err := run.New(filepath.Join(t.TempDir(), "run"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	p := testfixture.Replay(t, prompts, recorded)
+	if err := folder.SaveSource(src.Name, []byte(src.Frame)); err != nil {
+		t.Fatal(err)
+	}
+	testfixture.WriteFiles(t, filepath.Join(folder.Dir, filepath.FromSlash(run.ExtractNotes)), testfixture.LampStage1())
+	return src, folder
+}
+
+// TestRun runs step 1.3a on the invented chapter, serving each segment its
+// reply case, and checks the requests it made and the reports and flags it
+// wrote.
+func TestRun(t *testing.T) {
+	src, folder := extractFolder(t)
+	var cases []testfixture.Case
+	for _, c := range replyCases {
+		cases = append(cases, testfixture.Case{Contains: fmt.Sprintf("(segment %d: ", c.segment), Reply: c.reply})
+	}
+	p := testfixture.Serve(t, cases...)
 	if err := supportcheck.Run(context.Background(), p, src, folder); err != nil {
 		t.Fatal(err)
 	}
+
 	dir := filepath.Join(folder.Dir, run.SupportCheckDir)
-	testfixture.SameRequests(t, dir, recordedDir, "")
-
-	got := testfixture.Files(t, dir)
-	reports := map[int]checker.Report{}
-	var counts []int
-	for _, seg := range src.Segments {
-		n := strconv.Itoa(seg.Number)
-		if got[path.Join(run.ReportsDir, n+".md")] != recorded[seg.Number] {
-			t.Errorf("%s: report is not the recorded reply", seg)
+	for _, c := range replyCases {
+		n := strconv.Itoa(c.segment)
+		report, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(path.Join(run.ReportsDir, n+".md"))))
+		if err != nil {
+			t.Fatal(err)
 		}
-		var r checker.Report
-		if err := json.Unmarshal([]byte(got[path.Join(run.FlagsDir, n+".json")]), &r); err != nil {
-			t.Errorf("%s: flags: %v", seg, err)
-			continue
+		if string(report) != c.reply {
+			t.Errorf("segment %d: report is not the reply:\n got %q\nwant %q", c.segment, report, c.reply)
 		}
-		// Every recorded flag's H1 names one of its segment's notes, which
-		// Run records as the flag's file.
-		for i, f := range r.Flags {
-			if f.File != f.H1+".md" || !strings.HasPrefix(f.File, n+" ") {
-				t.Errorf("%s: flag %.60q has file %q, want its H1's note", seg, f.Statement, f.File)
-			}
-			r.Flags[i].File = ""
+		b, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(path.Join(run.FlagsDir, n+".json"))))
+		if err != nil {
+			t.Fatal(err)
 		}
-		if !reflect.DeepEqual(r, checker.Parse(recorded[seg.Number], supportcheck.Grades)) {
-			t.Errorf("%s: flags file is not the parsed report", seg)
+		var got checker.Report
+		if err := json.Unmarshal(b, &got); err != nil {
+			t.Fatalf("segment %d: flags: %v", c.segment, err)
 		}
-		// Segment 6's reply grades two statements on one line,
-		// `"It is the absolutistic brand…" / "It keeps no connexion…"`, which
-		// is a flag for each.
-		want := flagLines(recorded[seg.Number])
-		if seg.Number == 6 {
-			want++
+		if !reflect.DeepEqual(got, c.want) {
+			t.Errorf("segment %d: flags:\n got %+v\nwant %+v", c.segment, got, c.want)
 		}
-		if len(r.Flags) != want {
-			t.Errorf("%s: %d flags, want one per flag line and statement (%d)", seg, len(r.Flags), want)
-		}
-		reports[seg.Number] = r
-		counts = append(counts, len(r.Flags))
-	}
-	// Segments 1 and 3 have no flag; the rest have reads-alone grades, cuts
-	// and rewordings.
-	if want := []int{4, 0, 20, 0, 15, 7, 20, 15}; !reflect.DeepEqual(counts, want) {
-		t.Errorf("flags by segment %v, want %v", counts, want)
 	}
 
-	// Segment 0's reply flags four statements, then withdraws them all
-	// under "Correcting the above". The flags stand: a report's withdrawals
-	// are the repair call's to read, and reads-alone grades in step 1.3a's
-	// report call no repair.
-	r0 := reports[0]
-	var grades []string
-	for _, f := range r0.Flags {
-		if f.H1 != "0 What Pragmatism Means" {
-			t.Errorf("segment 0 flag %.60q is under %q", f.Statement, f.H1)
-		}
-		grades = append(grades, fmt.Sprint(f.Grades))
-	}
-	if want := []string{"[outside-frame]", "[dangling]", "[dangling]", "[dangling]"}; !reflect.DeepEqual(grades, want) {
-		t.Errorf("segment 0 grades %q, want %q", grades, want)
-	}
-	if f := r0.Flags[0]; f.Statement != "The pragmatic method is primarily a method of settling metaphysical disputes…" ||
-		!strings.HasPrefix(f.Reason, `the statement uses "The pragmatic method", which the segment's own notes never introduce.`) {
-		t.Errorf("segment 0's first flag = %+v", f)
-	}
-	if !containsLine(r0.Other, "0 What Pragmatism Means", "pass 6 / weak 0 / fail 0 / dangling 0 / outside-frame 0") {
-		t.Errorf("segment 0's counts line is not kept under its note: %+v", r0.Other)
-	}
-	var pair []string
-	for _, f := range reports[6].Flags {
-		if f.Reason == `"It" is resolvable to the brand of pantheism. Pass.` {
-			pair = append(pair, f.Statement)
-		}
-	}
-	if want := []string{"It is the absolutistic brand…", "It keeps no connexion…"}; !reflect.DeepEqual(pair, want) {
-		t.Errorf("segment 6's two-statement line gives %q, want %q", pair, want)
-	}
-	// Segment 5's reply gives a quoted statement a reworded grade.
-	if !slices.ContainsFunc(reports[5].Flags, func(f checker.Flag) bool {
-		return reflect.DeepEqual(f.Grades, []checker.Grade{checker.Reworded}) && strings.HasPrefix(f.Statement, "Pragmatism only follows here")
-	}) {
-		t.Errorf("segment 5 has no reworded flag: %+v", reports[5].Flags)
-	}
-
+	notes := testfixture.LampStage1Notes(t)
 	brief := testfixture.RepoFile(t, "internal/briefs/checker-support.md")
-	frame := testfixture.PragmatismFrame(t)
-	wantSystem := brief + "\n\n=== FRAME: " + testfixture.Pragmatism + ".md ===\n" + frame + "\n=== END FRAME ===\n\n" + sharedNotes(files)
+	wantSystem := brief + "\n\n=== FRAME: " + testfixture.Lamp + ".md ===\n" + testfixture.LampChapter + "\n=== END FRAME ===\n\n" + supportcheck.Shared(notes)
 	calls := p.Calls()
 	if len(calls) != len(src.Segments) {
-		t.Fatalf("%d calls, want %d", len(calls), len(src.Segments))
+		t.Fatalf("%d calls, want one per segment (%d)", len(calls), len(src.Segments))
 	}
+	var users []string
 	for _, c := range calls {
 		if c.System != wantSystem {
 			t.Errorf("call for %.80q: system prompt is not checker-support.md, the frame and every note", c.User)
 		}
-		if c.Model != "sonnet" {
-			t.Errorf("call for %.80q: model %q, want sonnet", c.User, c.Model)
+		if c.Model != "sonnet" || c.Effort != "medium" {
+			t.Errorf("call for %.80q: model %q at effort %q, want sonnet at medium", c.User, c.Model, c.Effort)
+		}
+		users = append(users, c.User)
+	}
+	for _, seg := range src.Segments {
+		if want := supportcheck.Prompt(notes, seg); !slices.Contains(users, want) {
+			t.Errorf("%s: no call has its prompt %q", seg, want)
 		}
 	}
-	if calls[0].User != prompts[0] {
-		t.Errorf("first call was not segment 0's")
+	if !strings.Contains(calls[0].User, "(segment 0: ") {
+		t.Errorf("first call was not segment 0's: %.80q", calls[0].User)
 	}
-}
-
-func containsLine(lines []checker.Line, h1, text string) bool {
-	for _, l := range lines {
-		if l.H1 == h1 && l.Text == text {
-			return true
-		}
-	}
-	return false
 }
