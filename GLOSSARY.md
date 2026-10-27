@@ -121,7 +121,7 @@ _Avoid_: drop (a dropped item is gone), skip
 ## The run
 
 **Brief**:
-The system prompt a model step runs with, fixed as trialled; changing one needs a re-trial.
+The system prompt a model step runs with, kept as it was last trialled; the maintainer decides when a change is worth a re-trial.
 _Avoid_: prompt, instructions
 
 **Text rule**:
