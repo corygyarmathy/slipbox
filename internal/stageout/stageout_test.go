@@ -17,18 +17,23 @@ import (
 	"github.com/corygyarmathy/slipbox/internal/testfixture"
 )
 
-// pragmatismFormatted is a run folder holding the Pragmatism run's steps up
-// to its run report, so step 3.1's gate is complete with the notes it passed
-// on, and the run's source.
-func pragmatismFormatted(t *testing.T) (*run.Folder, *source.Source) {
-	t.Helper()
-	return testfixture.PragmatismFolder(t, run.FormatGateDir, run.RunReportDir), testfixture.PragmatismSource(t)
-}
+// stagedReport is the run report lampFormatted's run wrote for step 3.2 to
+// stage.
+const stagedReport = "# Run report\n\nAn invented report, staged as it is.\n"
 
-// stagedReport is the Pragmatism run's report as step 3.2 stages it.
-func stagedReport(t *testing.T) string {
+// lampFormatted is a run folder for the invented Lamp chapter whose step
+// 3.1 gate is complete, having passed on LampStripped's notes, as a format
+// that changed nothing would, and the notes added, by slash-separated path
+// under the gate's notes; and whose run report wrote stagedReport. It gives
+// the notes the gate passed on, by the same paths, and the run's source.
+func lampFormatted(t *testing.T, added map[string]string) (*run.Folder, *source.Source, map[string]string) {
 	t.Helper()
-	return testfixture.Files(t, filepath.Join(testfixture.PragmatismRun(t), run.RunReportDir))[run.StagedReportFile]
+	src, folder := testfixture.LampRun(t)
+	notes := testfixture.LampStripped(t)
+	maps.Copy(notes, added)
+	testfixture.WriteFiles(t, filepath.Join(folder.Dir, filepath.FromSlash(run.FormattedOrFallbackNotes)), notes)
+	testfixture.WriteFiles(t, filepath.Join(folder.Dir, run.RunReportDir), map[string]string{run.StagedReportFile: stagedReport})
+	return folder, src, notes
 }
 
 // vault makes a vault whose _Slip_Box holds the notes named, each a path
@@ -51,11 +56,28 @@ func vault(t *testing.T, names ...string) string {
 	return dir
 }
 
-// Given the empty vault the Pragmatism run was given, step 3.2 stages what
-// the run staged, byte for byte: every note flat, the run report, and a
-// name-clash list with no clash.
-func TestRun_StagesThePragmatismRun(t *testing.T) {
-	folder, src := pragmatismFormatted(t)
+// staged is the notes of a run folder's gate, by slash-separated path under
+// it, as step 3.2 should stage them: each flat by its file name, unless
+// held, whose paths stay as they are.
+func staged(t *testing.T, notes map[string]string, held ...string) map[string]string {
+	t.Helper()
+	out := map[string]string{}
+	for rel, text := range notes {
+		if !slices.Contains(held, rel) {
+			rel = filepath.Base(rel)
+		}
+		if _, ok := out[rel]; ok {
+			t.Fatalf("two notes stage to %s; hold one", rel)
+		}
+		out[rel] = text
+	}
+	return out
+}
+
+// Given an empty vault, step 3.2 stages every note the gate passed on flat,
+// byte for byte, beside the run report and a name-clash list with no clash.
+func TestRun(t *testing.T) {
+	folder, src, notes := lampFormatted(t, nil)
 	v := vault(t)
 	staging := DefaultStaging(v, src.Name)
 	if err := Run(src, folder, v, staging); err != nil {
@@ -64,103 +86,55 @@ func TestRun_StagesThePragmatismRun(t *testing.T) {
 	if !folder.Complete(run.StageOutDir) {
 		t.Errorf("step 3.2 is not complete")
 	}
-	got, want := testfixture.Files(t, staging), testfixture.Files(t, testfixture.PragmatismStaged(t))
-	if !reflect.DeepEqual(slices.Sorted(maps.Keys(got)), slices.Sorted(maps.Keys(want))) {
-		t.Fatalf("staged %q, want the run's %q", slices.Sorted(maps.Keys(got)), slices.Sorted(maps.Keys(want)))
+	got := testfixture.Files(t, staging)
+	testfixture.Golden(t, "lamp/name-clashes.md", got[ClashListFile])
+	if got[RunReportFile] != stagedReport {
+		t.Errorf("staged %s = %q, want the run's staged report", RunReportFile, got[RunReportFile])
 	}
-	for name, text := range want {
-		if got[name] != text {
-			t.Errorf("staged %s is not the run's", name)
-		}
-	}
-	if len(want) != 66 {
-		t.Errorf("the run staged %d files, want its 64 notes, the clash list and the run report", len(want))
+	delete(got, ClashListFile)
+	delete(got, RunReportFile)
+	if want := staged(t, notes); !reflect.DeepEqual(got, want) {
+		t.Errorf("staged notes %q, want the gate's %q, each flat as it came", slices.Sorted(maps.Keys(got)), slices.Sorted(maps.Keys(want)))
 	}
 }
 
 const (
-	whatItMeans = "0 What Pragmatism Means"
-	truth       = "3 Pragmatism as a Theory of Truth"
-	extra       = "8 Extra"
+	keepers = "0 Keepers of the Lamp"
+	lens    = "2 The Lens"
+	extra   = "4 Extra"
 )
 
 // Notes named twice in the run, ignoring case, stay in their segment
 // folders, and the clash list names them, and each staged note named like a
 // _Slip_Box note. Here a folder no segment of the source claims adds two
-// notes named like segment 3's atomic note Inductive Logic and segment 0's
-// hub.
+// notes named like segment 2's atomic note Rings of Prisms and segment 0's
+// hub. Of the _Slip_Box notes, one is in a folder and in another case, and
+// one is named like a staged note but hidden in a dot folder.
 func TestRun_ListsNameClashes(t *testing.T) {
-	folder, src := pragmatismFormatted(t)
-	checked := filepath.Join(folder.Dir, filepath.FromSlash(run.FormattedOrFallbackNotes))
-	if err := os.Mkdir(filepath.Join(checked, extra), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	added := map[string]string{
-		"Inductive Logic.md":       "# Inductive Logic\n\nA note named as another segment's is.\n",
-		"WHAT PRAGMATISM MEANS.md": "# WHAT PRAGMATISM MEANS\n\nA note named as a hub is, in another case.\n",
+		extra + "/Rings of Prisms.md":     "# Rings of Prisms\n\nA note named as another segment's is.\n",
+		extra + "/KEEPERS OF THE LAMP.md": "# KEEPERS OF THE LAMP\n\nA note named as a hub is, in another case.\n",
 	}
-	for name, text := range added {
-		if err := os.WriteFile(filepath.Join(checked, extra, name), []byte(text), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	v := vault(t, "inductive logic.md", "Sub/THE INSTRUMENTAL VIEW OF TRUTH.md", "Unrelated.md", ".hidden/History of the Method.md", "History of the Method.png")
+	folder, src, notes := lampFormatted(t, added)
+	v := vault(t, "rings of prisms.md", "Sub/THE LENS MAKES A BEAM.md", "Unrelated.md", ".hidden/Storms.md", "Storms.png")
 	staging := DefaultStaging(v, src.Name)
 	if err := Run(src, folder, v, staging); err != nil {
 		t.Fatal(err)
 	}
 
-	held := map[string]string{
-		"Inductive Logic.md":       truth,
-		"What Pragmatism Means.md": whatItMeans,
-	}
-	want := map[string]string{}
-	for name, text := range testfixture.Files(t, testfixture.PragmatismStaged(t)) {
-		if name == ClashListFile {
-			continue
-		}
-		if f, ok := held[name]; ok {
-			name = f + "/" + name
-		}
-		want[name] = text
-	}
-	for name, text := range added {
-		want[extra+"/"+name] = text
-	}
 	got := testfixture.Files(t, staging)
 	clashes := got[ClashListFile]
+	testfixture.Golden(t, "clashes/name-clashes.md", clashes)
 	delete(got, ClashListFile)
+	delete(got, RunReportFile)
+	want := staged(t, notes,
+		keepers+"/Keepers of the Lamp.md", extra+"/KEEPERS OF THE LAMP.md",
+		lens+"/Rings of Prisms.md", extra+"/Rings of Prisms.md")
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("staged %d files, want %d: every note flat as it came but the four named twice, each in its segment folder", len(got), len(want))
-		for rel := range want {
-			if _, ok := got[rel]; !ok {
-				t.Errorf("missing %s", rel)
-			}
-		}
+		t.Errorf("staged %q, want %q: every note flat as it came but the four named twice, each in its segment folder", slices.Sorted(maps.Keys(got)), slices.Sorted(maps.Keys(want)))
 	}
 	if b, err := os.ReadFile(filepath.Join(folder.Dir, run.StageOutDir, ClashListFile)); err != nil || string(b) != clashes {
 		t.Errorf("the step's directory has no copy of the clash list (err %v)", err)
-	}
-
-	link := func(p string) string {
-		return "[[Staging/" + src.Name + "/" + strings.TrimSuffix(p, ".md") + "|" + p + "]]"
-	}
-	for _, line := range []string{
-		"- " + link(truth+"/Inductive Logic.md") + " and [[_Slip_Box/inductive logic|_Slip_Box/inductive logic.md]]\n",
-		"- " + link("The Instrumental View of Truth.md") + " and [[_Slip_Box/Sub/THE INSTRUMENTAL VIEW OF TRUTH|_Slip_Box/Sub/THE INSTRUMENTAL VIEW OF TRUTH.md]]\n",
-		"- " + link(extra+"/Inductive Logic.md") + " and [[_Slip_Box/inductive logic|_Slip_Box/inductive logic.md]]\n",
-		"- " + link(whatItMeans+"/What Pragmatism Means.md") + ", " + link(extra+"/WHAT PRAGMATISM MEANS.md") + "\n",
-		"- " + link(truth+"/Inductive Logic.md") + ", " + link(extra+"/Inductive Logic.md") + "\n",
-	} {
-		if !strings.Contains(clashes, line) {
-			t.Errorf("the clash list has no line %q:\n%s", line, clashes)
-		}
-	}
-	if n := strings.Count(clashes, "\n- "); n != 5 {
-		t.Errorf("the clash list has %d entries, want 5:\n%s", n, clashes)
-	}
-	if strings.Contains(clashes, "Unrelated") || strings.Contains(clashes, ".hidden") || strings.Contains(clashes, ".png") {
-		t.Errorf("the clash list names a note it shouldn't:\n%s", clashes)
 	}
 
 	for rel := range testfixture.Files(t, v) {
@@ -173,23 +147,39 @@ func TestRun_ListsNameClashes(t *testing.T) {
 	}
 }
 
+// ReadSlipBox lists the .md files under _Slip_Box, nested ones too, in byte
+// order, and skips a file or folder whose name starts with a dot.
+func TestReadSlipBox(t *testing.T) {
+	v := vault(t, "b.md", "Sub/a.md", "A.md", "Storms.png", ".Hidden.md", ".hidden/Storms.md")
+	if err := os.Mkdir(filepath.Join(v, SlipBoxDir, "Folder.md"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ReadSlipBox(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"_Slip_Box/A.md", "_Slip_Box/Sub/a.md", "_Slip_Box/b.md"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("ReadSlipBox = %q, want %q", got, want)
+	}
+}
+
 func TestRun_StagingFolderOutsideTheVault(t *testing.T) {
-	folder, src := pragmatismFormatted(t)
+	folder, src, _ := lampFormatted(t, nil)
 	staging := filepath.Join(t.TempDir(), "elsewhere")
-	if err := Run(src, folder, vault(t, "Inductive Logic.md"), staging); err != nil {
+	if err := Run(src, folder, vault(t, "Rings of Prisms.md"), staging); err != nil {
 		t.Fatal(err)
 	}
 	b, err := os.ReadFile(filepath.Join(staging, ClashListFile))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "- `Inductive Logic.md` and [[_Slip_Box/Inductive Logic|_Slip_Box/Inductive Logic.md]]\n"; !strings.Contains(string(b), want) {
+	if want := "- `Rings of Prisms.md` and [[_Slip_Box/Rings of Prisms|_Slip_Box/Rings of Prisms.md]]\n"; !strings.Contains(string(b), want) {
 		t.Errorf("the clash list has no line %q, the staged note as code:\n%s", want, b)
 	}
 }
 
 func TestRun_AnOccupiedStagingFolderStops(t *testing.T) {
-	folder, src := pragmatismFormatted(t)
+	folder, src, _ := lampFormatted(t, nil)
 	v := vault(t)
 	staging := DefaultStaging(v, src.Name)
 	if err := os.MkdirAll(staging, 0o755); err != nil {
@@ -221,7 +211,7 @@ func TestRun_AnOccupiedStagingFolderStops(t *testing.T) {
 }
 
 func TestRun_AStagingFolderInTheRunFolderStops(t *testing.T) {
-	folder, src := pragmatismFormatted(t)
+	folder, src, _ := lampFormatted(t, nil)
 	staging := filepath.Join(folder.Dir, "out", "staged")
 	if err := Run(src, folder, vault(t), staging); err == nil || !strings.Contains(err.Error(), "inside the run folder") {
 		t.Fatalf("Run = %v, want an error: the staged notes would go when the run folder is deleted", err)
@@ -241,7 +231,7 @@ func TestRun_AStagingFolderInTheRunFolderStops(t *testing.T) {
 }
 
 func TestRun_ANoteNamedLikeTheClashListOrTheRunReportIsHeld(t *testing.T) {
-	folder, src := pragmatismFormatted(t)
+	folder, src, _ := lampFormatted(t, nil)
 	seg := filepath.Join(folder.Dir, filepath.FromSlash(run.FormattedOrFallbackNotes), extra)
 	if err := os.MkdirAll(seg, 0o755); err != nil {
 		t.Fatal(err)
@@ -268,7 +258,7 @@ func TestRun_ANoteNamedLikeTheClashListOrTheRunReportIsHeld(t *testing.T) {
 		t.Errorf("the clash list has no line %q:\n%s", want, got[ClashListFile])
 	}
 	// The run report's name is held the same way.
-	if got[RunReportFile] != stagedReport(t) || got[extra+"/Run-Report.md"] == "" {
+	if got[RunReportFile] != stagedReport || got[extra+"/Run-Report.md"] == "" {
 		t.Errorf("the run report or the note named like it is not where it belongs")
 	}
 	if want := "- [[Staging/" + src.Name + "/run-report|run-report.md]], [[Staging/" + src.Name + "/" + extra + "/Run-Report|" + extra + "/Run-Report.md]]\n"; !strings.Contains(got[ClashListFile], want) {
@@ -300,7 +290,7 @@ func TestWrite_RemovesWhatItMadeOnAFailure(t *testing.T) {
 }
 
 func TestRun_Errors(t *testing.T) {
-	folder, src := pragmatismFormatted(t)
+	folder, src, _ := lampFormatted(t, nil)
 	if err := Run(src, folder, "", "staging"); !errors.Is(err, ErrNoVault) {
 		t.Errorf("Run with no vault = %v, want ErrNoVault", err)
 	}
@@ -314,7 +304,7 @@ func TestRun_Errors(t *testing.T) {
 	if err := os.Rename(filepath.Join(folder.Dir, run.FormatGateDir), filepath.Join(folder.Dir, run.FormatGateDir+run.PartialSuffix)); err != nil {
 		t.Fatal(err)
 	}
-	if err := Run(src, folder, vault(t), "staging"); err == nil || !strings.Contains(err.Error(), "gate") {
+	if err := Run(src, folder, vault(t), "staging"); err == nil || !strings.Contains(err.Error(), "gate is not complete") {
 		t.Errorf("Run before step 3.1's gate = %v, want an error", err)
 	}
 }
