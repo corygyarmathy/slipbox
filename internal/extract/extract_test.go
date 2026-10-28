@@ -305,7 +305,7 @@ func TestRun_WithoutQuoteOnce(t *testing.T) {
 // prompt.
 func checkCalls(t *testing.T, calls []provider.Request, src *source.Source, brief string) {
 	t.Helper()
-	wantSystem := brief + "\n\n=== FRAME: " + testfixture.Lamp + ".md ===\n" + testfixture.LampChapter + "\n=== END FRAME ===\n"
+	wantSystem := brief + "\n\n" + testfixture.LampFrame
 	if len(calls) != len(src.Segments) {
 		t.Fatalf("%d calls, want one per segment (%d)", len(calls), len(src.Segments))
 	}

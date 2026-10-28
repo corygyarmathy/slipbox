@@ -311,7 +311,7 @@ func TestRun(t *testing.T) {
 	// medium.
 	notes := readNotes(t, folder, run.RepairNotes)
 	brief := testfixture.RepoFile(t, "internal/briefs/proposer.md")
-	wantSystem := brief + "\n\n=== FRAME: " + testfixture.Lamp + ".md ===\n" + testfixture.LampChapter + "\n=== END FRAME ===\n\n" + lossproposer.Shared(notes)
+	wantSystem := brief + "\n\n" + testfixture.LampFrame + "\n" + lossproposer.Shared(notes)
 	calls := p.Calls()
 	if len(calls) != lossproposer.Runs*len(replyCases) {
 		t.Fatalf("%d calls, want %d: two per segment with an uncovered list", len(calls), lossproposer.Runs*len(replyCases))

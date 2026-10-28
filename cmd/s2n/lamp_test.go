@@ -16,11 +16,6 @@ import (
 	"github.com/corygyarmathy/slipbox/internal/testfixture"
 )
 
-// lampFrame is the frame of every system prompt on the invented chapter,
-// Lamp: the chapter as it is on disk, not the parsed source's Frame, so a
-// fault in parsing still shows.
-const lampFrame = "=== FRAME: " + testfixture.Lamp + ".md ===\n" + testfixture.LampChapter + "\n=== END FRAME ===\n"
-
 // lampSourcePath writes Lamp where s2n run can read it, and gives its path.
 func lampSourcePath(t *testing.T) string {
 	t.Helper()

@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/corygyarmathy/slipbox/internal/modelstep"
 	"github.com/corygyarmathy/slipbox/internal/run"
 	"github.com/corygyarmathy/slipbox/internal/splitgates"
 	"github.com/corygyarmathy/slipbox/internal/striptraces"
@@ -42,5 +43,34 @@ func TestLampStripped(t *testing.T) {
 	want := Files(t, filepath.Join(folder.Dir, filepath.FromSlash(run.StrippedNotes)))
 	if got := LampStripped(t); !reflect.DeepEqual(got, want) {
 		t.Errorf("LampStripped gives\n%q\nwant what step 2.2 wrote\n%q", got, want)
+	}
+}
+
+// TestLampFrame checks LampFrame is the frame the steps give after the brief
+// in a system prompt on LampChapter, so a test that builds its expected
+// system prompt from LampFrame expects what the steps send.
+func TestLampFrame(t *testing.T) {
+	if got, want := modelstep.SystemPrompt("BRIEF", LampSource(t), ""), "BRIEF\n\n"+LampFrame; got != want {
+		t.Errorf("system prompt is\n%q\nwant\n%q", got, want)
+	}
+}
+
+// TestSegmentNotes checks SegmentNotes gives every note of the segment,
+// asides too, and none of another segment's, even one whose number starts
+// with the segment's (10 for 1).
+func TestSegmentNotes(t *testing.T) {
+	files := map[string]string{
+		"0 Zero.md":            "zero",
+		"1 One.md":             "one",
+		"1 One - Aside - A.md": "aside",
+		"10 Ten.md":            "ten",
+		"2 Two 1.md":           "two",
+	}
+	want := map[string]string{"1 One.md": "one", "1 One - Aside - A.md": "aside"}
+	if got := SegmentNotes(files, 1); !reflect.DeepEqual(got, want) {
+		t.Errorf("segment 1's notes are %q, want %q", got, want)
+	}
+	if got := SegmentNotes(files, 3); len(got) != 0 {
+		t.Errorf("segment 3's notes are %q, want none", got)
 	}
 }

@@ -202,7 +202,7 @@ func TestResume_AddsEveryLoss(t *testing.T) {
 	// Each kept-loss call is given its segment's losses and the notes step
 	// 1.4 left, segment 2's first.
 	wantSystem := testfixture.RepoFile(t, "internal/briefs/kept-loss-edits-quote-once.md") + "\n\n" +
-		testfixture.RepoFile(t, "internal/briefs/stage-1-quote-once.md") + "\n\n" + lampFrame
+		testfixture.RepoFile(t, "internal/briefs/stage-1-quote-once.md") + "\n\n" + testfixture.LampFrame
 	for i, n := range []int{2, 3} {
 		c := calls[i]
 		if c.System != wantSystem || c.Model != "opus" || c.Effort != "medium" {
@@ -218,7 +218,7 @@ func TestResume_AddsEveryLoss(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantSystem = testfixture.RepoFile(t, "internal/briefs/checker-support.md") + "\n\n" + lampFrame + "\n" + supportcheck.Shared(after)
+	wantSystem = testfixture.RepoFile(t, "internal/briefs/checker-support.md") + "\n\n" + testfixture.LampFrame + "\n" + supportcheck.Shared(after)
 	for i, n := range []int{2, 3} {
 		c := calls[2+i]
 		if c.System != wantSystem || c.Model != "sonnet" || c.Effort != "medium" {

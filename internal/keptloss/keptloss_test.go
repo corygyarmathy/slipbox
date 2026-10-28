@@ -58,28 +58,12 @@ func proposedRun(t *testing.T, losses []lossproposer.Segment) (*source.Source, *
 	return src, folder
 }
 
-// segmentNotes gives the notes in files, by file name, whose names start
-// with segment n's number.
-func segmentNotes(files map[string]string, n int) map[string]string {
-	out := map[string]string{}
-	for name, text := range files {
-		if strings.HasPrefix(name, strconv.Itoa(n)+" ") {
-			out[name] = text
-		}
-	}
-	return out
-}
-
-// frame is the invented chapter's frame, as a system prompt gives it after
-// its brief.
-const frame = "\n\n=== FRAME: " + testfixture.Lamp + ".md ===\n" + testfixture.LampChapter + "\n=== END FRAME ===\n"
-
 // wantSystem is the system prompt of a kept-loss call on the invented
 // chapter briefed by brief, then rules, files in internal/briefs/. It is
 // built here rather than with keptloss.Brief, so a fault there still shows.
 func wantSystem(t *testing.T, brief, rules string) string {
 	t.Helper()
-	return testfixture.RepoFile(t, "internal/briefs/"+brief) + "\n\n" + testfixture.RepoFile(t, "internal/briefs/"+rules) + frame
+	return testfixture.RepoFile(t, "internal/briefs/"+brief) + "\n\n" + testfixture.RepoFile(t, "internal/briefs/"+rules) + "\n\n" + testfixture.LampFrame
 }
 
 // briefFiles names each reply shape's brief, then its rules, files in
@@ -177,7 +161,7 @@ var runCases = []runCase{
 			"- [cut would do] \"He trimmed the wick…\": a cut to \"The keeper\" would name him.\n" +
 			"pass 2 / cut would do 1\n\n" +
 			"# 1 The Keeper's Watch - Aside - The log\n\npass 2\n",
-		segmentNotes(testfixture.LampStage1(), 1),
+		testfixture.SegmentNotes(testfixture.LampStage1(), 1),
 		"- Loss 1.1: already stated.\n- Loss 1.2: already in the aside.\n"},
 	// A quote-once insert, traced by s2n. The re-check flags the new
 	// statement with a grade that counts beside one that doesn't, a statement
@@ -254,14 +238,14 @@ func TestRun(t *testing.T) {
 			if got := files[run.ReportsDir+"/"+n+".md"]; got != c.report {
 				t.Errorf("segment %d: report %q, want %q", c.segment, got, c.report)
 			}
-			if got := segmentNotes(after, c.segment); !reflect.DeepEqual(got, c.notes) {
+			if got := testfixture.SegmentNotes(after, c.segment); !reflect.DeepEqual(got, c.notes) {
 				t.Errorf("segment %d: notes:\n got %q\nwant %q", c.segment, got, c.notes)
 			}
 		})
 	}
 	// Segment 0, with no proposed loss, has no call and keeps step 1.4's
 	// notes.
-	if got, want := segmentNotes(after, 0), segmentNotes(testfixture.LampStage1(), 0); !reflect.DeepEqual(got, want) {
+	if got, want := testfixture.SegmentNotes(after, 0), testfixture.SegmentNotes(testfixture.LampStage1(), 0); !reflect.DeepEqual(got, want) {
 		t.Errorf("segment 0's notes are not step 1.4's:\n got %q\nwant %q", got, want)
 	}
 	for _, rel := range []string{run.RawDir + "/0.txt", run.ReportsDir + "/0.md"} {
@@ -323,7 +307,7 @@ func TestRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	recheckSystem := testfixture.RepoFile(t, "internal/briefs/checker-support.md") + frame + "\n" + supportcheck.Shared(afterNotes)
+	recheckSystem := testfixture.RepoFile(t, "internal/briefs/checker-support.md") + "\n\n" + testfixture.LampFrame + "\n" + supportcheck.Shared(afterNotes)
 	for _, c := range p.Calls() {
 		if !isKeptCall(c.User) && c.System != recheckSystem {
 			t.Errorf("re-check call for %.80q: system prompt is not step 1.3a's brief, the frame and the kept-loss notes", c.User)
@@ -612,11 +596,11 @@ func TestRun_Replies(t *testing.T) {
 			}
 
 			after := testfixture.Files(t, filepath.Join(folder.Dir, filepath.FromSlash(run.KeptLossNotes)))
-			if got := segmentNotes(after, 3); !reflect.DeepEqual(got, c.notes) {
+			if got := testfixture.SegmentNotes(after, 3); !reflect.DeepEqual(got, c.notes) {
 				t.Errorf("segment 3's notes:\n got %q\nwant %q", got, c.notes)
 			}
 			for _, n := range []int{0, 1, 2} {
-				if got, want := segmentNotes(after, n), segmentNotes(testfixture.LampStage1(), n); !reflect.DeepEqual(got, want) {
+				if got, want := testfixture.SegmentNotes(after, n), testfixture.SegmentNotes(testfixture.LampStage1(), n); !reflect.DeepEqual(got, want) {
 					t.Errorf("segment %d's notes are not step 1.4's", n)
 				}
 			}

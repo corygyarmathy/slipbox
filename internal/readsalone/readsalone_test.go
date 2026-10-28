@@ -163,7 +163,7 @@ func TestRun(t *testing.T) {
 
 	notes := testfixture.LampStage1Notes(t)
 	brief := testfixture.RepoFile(t, "internal/briefs/checker-reads-alone.md")
-	wantSystem := brief + "\n\n=== FRAME: " + testfixture.Lamp + ".md ===\n" + testfixture.LampChapter + "\n=== END FRAME ===\n"
+	wantSystem := brief + "\n\n" + testfixture.LampFrame
 	calls := p.Calls()
 	if len(calls) != len(src.Segments) {
 		t.Fatalf("%d calls, want one per segment (%d)", len(calls), len(src.Segments))
