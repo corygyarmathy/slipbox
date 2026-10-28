@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -14,8 +15,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/corygyarmathy/slipbox/internal/briefs"
 	"github.com/corygyarmathy/slipbox/internal/extract"
+	"github.com/corygyarmathy/slipbox/internal/fallback"
 	"github.com/corygyarmathy/slipbox/internal/format"
 	"github.com/corygyarmathy/slipbox/internal/keptloss"
 	"github.com/corygyarmathy/slipbox/internal/lossproposer"
@@ -33,313 +34,258 @@ import (
 	"github.com/corygyarmathy/slipbox/internal/testfixture"
 )
 
-// recordedStep is a model step of the Pragmatism run, as a replay serves it:
-// the user prompts the run sends, in its order, each with the reply the run
-// recorded to it.
-type recordedStep struct {
-	// name is the step as the design numbers it, and dirs are where its
-	// calls' requests are recorded, from the run folder.
-	name string
-	dirs []string
-	// model and briefs are what the run's calls asked for at the defaults,
-	// and shared what its calls share in the system prompt after the frame,
-	// or "".
-	model   string
-	briefs  []string
-	shared  string
-	prompts []string
-	replies []string
-}
+// wantCall is a call a step is to make: its model, at medium effort, and its
+// system and user prompts.
+type wantCall struct{ model, system, user string }
 
-// The Pragmatism run's model steps, by their index in pragmatismSteps.
-const (
-	extractStep = iota
-	supportStep
-	readsAloneStep
-	repairStep
-	supportRecheckStep
-	readsAloneRecheckStep
-	proposerStep
-	keptLossStep
-	keptLossRecheckStep
-	splitStep
-	formatStep
-)
+// TestRun_Lamp runs `s2n run` on Lamp at the defaults, through every model
+// step (lampEveryStep), stopped after the run report, then resumed to stage
+// out, given an empty vault. Each step's calls are briefed and tiered as the
+// defaults say, and each user prompt is built from what the steps before it
+// left in the run folder, so the steps hand their work on through it. What
+// each step writes is for its own tests to say.
+func TestRun_Lamp(t *testing.T) {
+	runDir := filepath.Join(t.TempDir(), "run")
+	p := lampModel(t, runDir, lampEveryStep())
+	var stdout, stderr bytes.Buffer
+	if code := runCommand(context.Background(), []string{"run", "-run-dir", runDir, "-stop-after", run.RunReportDir, lampSourcePath(t)}, &stdout, &stderr, p); code != 0 {
+		t.Fatalf("exit %d, want 0: %s", code, stderr.String())
+	}
+	if got := strings.TrimSpace(stdout.String()); got != runDir {
+		t.Errorf("stdout = %q, want the run folder %q", got, runDir)
+	}
+	if want := "s2n run: stopped after " + run.RunReportDir + ", as -stop-after asked. Run s2n resume " + runDir + " to go on.\n"; stderr.String() != want {
+		t.Errorf("stderr = %q, want %q", stderr.String(), want)
+	}
+	folder := &run.Folder{Dir: runDir}
+	if p, err := folder.SourcePath(); err != nil {
+		t.Errorf("run folder has no copy of the source: %v", err)
+	} else if b, err := os.ReadFile(p); err != nil || string(b) != testfixture.LampChapter {
+		t.Errorf("run folder's source is not the chapter read (err %v)", err)
+	} else if filepath.Base(p) != testfixture.Lamp+".md" {
+		t.Errorf("run folder's source is named %q", filepath.Base(p))
+	}
 
-// pragmatismSteps gives the Pragmatism run's model steps, each with the
-// user prompts the run sends for src and the run's recorded reply to each.
-// The prompts are built from the notes and lists the recorded run folder
-// holds at each step, so a step that sends something else finds no reply.
-// Step 1.4 calls the six segments whose flags count, and re-checks the four
-// its replies changed. Step 1.5 calls every segment, which each have an
-// uncovered list, twice. The kept-loss repair calls segment 0, the one
-// segment with a loss, and re-checks it.
-func pragmatismSteps(t *testing.T, src *source.Source) []recordedStep {
-	t.Helper()
-	recorded := testfixture.PragmatismRun(t)
-	at := func(rel ...string) string { return filepath.Join(append([]string{recorded}, rel...)...) }
-	notes := func(dir string) []*note.Note {
-		n, err := note.ReadDir(at(filepath.FromSlash(dir)))
+	// What each step was to be given, read from the run folder as the steps
+	// before it left it.
+	src := testfixture.LampSource(t)
+	at := func(rel string) string { return filepath.Join(runDir, filepath.FromSlash(rel)) }
+	notes := func(rel string) []*note.Note {
+		n, err := note.ReadDir(at(rel))
 		if err != nil {
 			t.Fatal(err)
 		}
 		return n
 	}
 	extracted, repaired, kept, final := notes(run.ExtractNotes), notes(run.RepairNotes), notes(run.KeptLossNotes), notes(run.FinalNotes)
-	// raw is a step's recorded replies, by segment number.
-	raw := func(dir ...string) map[int]string {
-		out := map[int]string{}
-		for name, text := range testfixture.Files(t, at(append(dir, run.RawDir)...)) {
-			n, err := strconv.Atoi(strings.TrimSuffix(name, ".txt"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			out[n] = text
-		}
-		return out
-	}
-	// add adds a call for each segment with a recorded reply in dir, in
-	// segment order, its prompt given by prompt.
-	add := func(s *recordedStep, dir []string, prompt func(seg source.Segment) string) {
-		replies := raw(dir...)
-		for _, seg := range src.Segments {
-			if r, ok := replies[seg.Number]; ok {
-				s.prompts = append(s.prompts, prompt(seg))
-				s.replies = append(s.replies, r)
-			}
-		}
-	}
-	step := func(name, model string, briefs []string, shared string, dir string, prompt func(seg source.Segment) string) recordedStep {
-		s := recordedStep{name: name, dirs: []string{dir}, model: model, briefs: briefs, shared: shared}
-		add(&s, strings.Split(dir, "/"), prompt)
-		return s
-	}
-
-	support := raw(run.SupportCheckDir)
-	readsAlone := raw(run.ReadsAloneDir)
 	mech := testfixture.Files(t, at(run.MechanicalCheckDir))[run.ReportFile]
-	uncovered := testfixture.Files(t, at(run.MechanicalRecheckDir, run.UncoveredDir))
-	var keptLosses []keptloss.Kept
-	if err := json.Unmarshal([]byte(testfixture.Files(t, at(run.KeptLossDir))[run.KeptLossesFile]), &keptLosses); err != nil {
-		t.Fatal(err)
-	}
-	stripped, err := split.ReadFolders(at(filepath.FromSlash(run.StrippedNotes)))
+	uncovered := testfixture.Files(t, at(run.MechanicalRecheckDir+"/"+run.UncoveredDir))
+	keptLosses, err := keptloss.Losses(folder)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	proposer := recordedStep{name: "1.5", model: "sonnet", briefs: []string{"proposer.md"}, shared: lossproposer.Shared(repaired)}
-	for k := 1; k <= lossproposer.Runs; k++ {
-		dir := run.LossProposerDir + "/" + run.RunPrefix + strconv.Itoa(k)
-		proposer.dirs = append(proposer.dirs, dir)
-		add(&proposer, strings.Split(dir, "/"), func(seg source.Segment) string {
-			return lossproposer.Prompt(seg, uncovered[strconv.Itoa(seg.Number)+".txt"])
-		})
+	stripped, err := split.ReadFolders(at(run.StrippedNotes))
+	if err != nil {
+		t.Fatal(err)
 	}
-	return []recordedStep{
-		extractStep: step("1.1", "opus", []string{"stage-1-quote-once.md"}, "", run.ExtractDir, func(seg source.Segment) string {
+	// The run did what lampEveryStep sets it up to: the kept-loss repair
+	// added its loss after the statement step 1.4 repaired, and no segment
+	// fell back.
+	if n := testfixture.Files(t, at(run.FinalNotes))["1 The Keeper's Watch.md"]; !strings.Contains(n, "also logged the weather in a book.[^4] Then the inspectors read every page.[^5]\n") {
+		t.Errorf("the final notes do not hold the repair and the kept loss:\n%s", n)
+	}
+	for _, dir := range []string{run.SplitGatesDir, run.FormatGateDir} {
+		if items, err := fallback.Read(folder, dir); err != nil || len(items) != 0 {
+			t.Errorf("%s: fallbacks %+v (err %v), want none", dir, items, err)
+		}
+	}
+
+	// A step's system prompt is its briefs, the frame and then what its
+	// calls share, if anything.
+	system := func(shared string, briefFiles ...string) string {
+		var text []string
+		for _, b := range briefFiles {
+			text = append(text, testfixture.RepoFile(t, "internal/briefs/"+b))
+		}
+		s := strings.Join(text, "\n\n") + "\n\n" + lampFrame
+		if shared != "" {
+			s += "\n" + shared
+		}
+		return s
+	}
+	every := []int{0, 1, 2, 3}
+	calls := func(model, system string, segs []int, user func(seg source.Segment) string) []wantCall {
+		var out []wantCall
+		for _, n := range segs {
+			out = append(out, wantCall{model, system, user(src.Segments[n])})
+		}
+		return out
+	}
+	proposer := calls("sonnet", system(lossproposer.Shared(repaired), "proposer.md"), []int{1, 2, 3}, func(seg source.Segment) string {
+		return lossproposer.Prompt(seg, uncovered[strconv.Itoa(seg.Number)+".txt"])
+	})
+	steps := []struct {
+		name  string
+		calls []wantCall
+	}{
+		{"1.1", calls("opus", system("", "stage-1-quote-once.md"), every, func(seg source.Segment) string {
 			return extract.Prompt(src, seg)
-		}),
-		supportStep: step("1.3a", "sonnet", []string{"checker-support.md"}, supportcheck.Shared(extracted), run.SupportCheckDir, func(seg source.Segment) string {
+		})},
+		{"1.3a", calls("sonnet", system(supportcheck.Shared(extracted), "checker-support.md"), every, func(seg source.Segment) string {
 			return supportcheck.Prompt(extracted, seg)
-		}),
-		readsAloneStep: step("1.3b", "sonnet", []string{"checker-reads-alone.md"}, "", run.ReadsAloneDir, func(seg source.Segment) string {
+		})},
+		{"1.3b", calls("sonnet", system("", "checker-reads-alone.md"), every, func(seg source.Segment) string {
 			return readsalone.Prompt(extracted, seg)
-		}),
-		repairStep: step("1.4", "opus", []string{"repair-edits-quote-once.md", "stage-1-quote-once.md"}, "", run.RepairDir, func(seg source.Segment) string {
-			return repair.Prompt(extracted, seg, mech, support[seg.Number], readsAlone[seg.Number])
-		}),
-		supportRecheckStep: step("1.4 re-check 1.3a", "sonnet", []string{"checker-support.md"}, supportcheck.Shared(repaired), run.SupportRecheckDir, func(seg source.Segment) string {
+		})},
+		// Step 1.4 calls the one segment with a flag that counts, given step
+		// 1.2's report and the segment's step 1.3 replies.
+		{"1.4", calls("opus", system("", "repair-edits-quote-once.md", "stage-1-quote-once.md"), []int{1}, func(seg source.Segment) string {
+			return repair.Prompt(extracted, seg, mech, "pass\n", watchDangling)
+		})},
+		{"1.4 re-check 1.3a", calls("sonnet", system(supportcheck.Shared(repaired), "checker-support.md"), []int{1}, func(seg source.Segment) string {
 			return supportcheck.Prompt(repaired, seg)
-		}),
-		readsAloneRecheckStep: step("1.4 re-check 1.3b", "sonnet", []string{"checker-reads-alone.md"}, "", run.ReadsAloneRecheckDir, func(seg source.Segment) string {
+		})},
+		{"1.4 re-check 1.3b", calls("sonnet", system("", "checker-reads-alone.md"), []int{1}, func(seg source.Segment) string {
 			return readsalone.Prompt(repaired, seg)
-		}),
-		proposerStep: proposer,
-		keptLossStep: step("kept-loss repair", "opus", []string{"kept-loss-edits-quote-once.md", "stage-1-quote-once.md"}, "", run.KeptLossDir, func(seg source.Segment) string {
-			var mine []keptloss.Kept
-			for _, k := range keptLosses {
-				if k.Segment == seg.Number {
-					mine = append(mine, k)
-				}
-			}
-			return keptloss.Prompt(repaired, seg, mine)
-		}),
-		keptLossRecheckStep: step("kept-loss re-check 1.3a", "sonnet", []string{"checker-support.md"}, supportcheck.Shared(kept), run.KeptLossDir+"/"+run.KeptLossSupportDir, func(seg source.Segment) string {
+		})},
+		// Step 1.5 calls each segment with an uncovered list, twice.
+		{"1.5 run 1", proposer},
+		{"1.5 run 2", proposer},
+		// The kept-loss repair calls the one segment with a loss, given the
+		// notes step 1.4 left, and re-checks it.
+		{"kept-loss repair", calls("opus", system("", "kept-loss-edits-quote-once.md", "stage-1-quote-once.md"), []int{1}, func(seg source.Segment) string {
+			return keptloss.Prompt(repaired, seg, keptLosses)
+		})},
+		{"kept-loss re-check 1.3a", calls("sonnet", system(supportcheck.Shared(kept), "checker-support.md"), []int{1}, func(seg source.Segment) string {
 			return supportcheck.Prompt(kept, seg)
-		}),
-		splitStep: step("2.1", "sonnet", []string{"stage-2.md"}, "", run.SplitDir, func(seg source.Segment) string {
+		})},
+		{"2.1", calls("sonnet", system("", "stage-2.md"), every, func(seg source.Segment) string {
 			prompt, _ := split.Prompt(src, final, seg)
 			return prompt
-		}),
-		formatStep: step("3.1", "haiku", []string{"stage-3.md"}, "", run.FormatDir, func(seg source.Segment) string {
+		})},
+		{"3.1", calls("haiku", system("", "stage-3.md"), every, func(seg source.Segment) string {
 			for _, f := range stripped {
 				if f.Name == split.Folder(seg) {
 					return format.Prompt(f)
 				}
 			}
-			t.Fatalf("no stripped notes for segment %d", seg.Number)
+			t.Fatalf("no stripped notes for %s", seg)
 			return ""
-		}),
+		})},
 	}
-}
 
-// replies gives steps' prompts and replies, in order, for a replay.
-func replies(steps ...recordedStep) (prompts, replies []string) {
+	// The steps run in order, and each makes its calls before the next
+	// begins: its first segment's first, then the rest in any order.
+	got := p.Calls()
+	total := 0
 	for _, s := range steps {
-		prompts = append(prompts, s.prompts...)
-		replies = append(replies, s.replies...)
+		total += len(s.calls)
 	}
-	return prompts, replies
-}
-
-// pragmatismReplay is a replay of the Pragmatism run's steps up to and
-// including the step at index last.
-func pragmatismReplay(t *testing.T, src *source.Source, last int) (*provider.Replay, []recordedStep) {
-	t.Helper()
-	steps := pragmatismSteps(t, src)[:last+1]
-	prompts, replies := replies(steps...)
-	return testfixture.Replay(t, prompts, replies), steps
-}
-
-// TestRun_ReplaysThePragmatismRun runs `s2n run` on the Pragmatism source
-// with the run's recorded replies and the defaults, as the run was made:
-// stopped after the run report, then resumed to stage out, given an empty
-// vault. Each step makes the requests the run recorded, so it writes what
-// the run wrote, and the staging folder is the run's, byte for byte.
-func TestRun_ReplaysThePragmatismRun(t *testing.T) {
-	sourcePath := testfixture.SourcePath(t, testfixture.Pragmatism)
-	src := testfixture.PragmatismSource(t)
-	recorded := testfixture.PragmatismRun(t)
-	p, steps := pragmatismReplay(t, src, formatStep)
-
-	runDir := filepath.Join(t.TempDir(), "run")
-	var stdout, stderr bytes.Buffer
-	if code := runCommand(context.Background(), []string{"run", "-run-dir", runDir, "-stop-after", run.RunReportDir, sourcePath}, &stdout, &stderr, p); code != 0 {
-		t.Fatalf("exit %d, want 0: %s", code, stderr.String())
+	if len(got) != total {
+		t.Fatalf("%d calls, want %d", len(got), total)
 	}
-	if got := strings.TrimSpace(stdout.String()); got != runDir {
-		t.Errorf("stdout = %q, want the run folder %q", got, runDir)
-	}
-	folder := &run.Folder{Dir: runDir}
-	if p, err := folder.SourcePath(); err != nil {
-		t.Errorf("run folder has no copy of the source: %v", err)
-	} else if b, err := os.ReadFile(p); err != nil || string(b) != src.Frame {
-		t.Errorf("run folder's source is not the frame read (err %v)", err)
-	} else if filepath.Base(p) != testfixture.Pragmatism+".md" {
-		t.Errorf("run folder's source is named %q", filepath.Base(p))
-	}
-
-	// A step's system prompt is its briefs, the frame and then the notes its
-	// calls share, if it has any.
-	frame := testfixture.PragmatismFrame(t)
-	system := func(s recordedStep) string {
-		var text []string
-		for _, b := range s.briefs {
-			text = append(text, testfixture.RepoFile(t, "internal/briefs/"+b))
-		}
-		system := strings.Join(text, "\n\n") + "\n\n=== FRAME: " + testfixture.Pragmatism + ".md ===\n" + frame + "\n=== END FRAME ===\n"
-		if s.shared != "" {
-			system += "\n" + s.shared
-		}
-		return system
-	}
-	calls := p.Calls()
-	prompts, _ := replies(steps...)
-	if len(calls) != len(prompts) || len(calls) != 72 {
-		t.Fatalf("%d calls, want the run's %d, one per recorded reply (72)", len(calls), len(prompts))
-	}
-	at := 0
+	next := 0
 	for _, s := range steps {
-		for _, c := range calls[at : at+len(s.prompts)] {
-			if c.System != system(s) {
-				t.Errorf("step %s call for %.80q: system prompt is not %s, the frame and the step's shared notes", s.name, c.User, s.briefs)
+		made := got[next : next+len(s.calls)]
+		next += len(s.calls)
+		if made[0].User != s.calls[0].user {
+			t.Errorf("step %s's first call was %.80q, want its first segment's", s.name, made[0].User)
+		}
+		for _, w := range s.calls {
+			i := slices.IndexFunc(made, func(c provider.Request) bool { return c.User == w.user })
+			if i < 0 {
+				t.Errorf("step %s made no call for %.80q", s.name, w.user)
+				continue
 			}
-			if c.Model != s.model || c.Effort != "medium" {
-				t.Errorf("step %s call for %.80q: model %q at %q, want %s at medium", s.name, c.User, c.Model, c.Effort, s.model)
+			if c := made[i]; c.System != w.system {
+				t.Errorf("step %s call for %.80q: system prompt is not its briefs, the frame and what its calls share", s.name, c.User)
+			} else if c.Model != w.model || c.Effort != "medium" {
+				t.Errorf("step %s call for %.80q: model %q at %q, want %s at medium", s.name, c.User, c.Model, c.Effort, w.model)
 			}
 		}
-		if calls[at].User != s.prompts[0] {
-			t.Errorf("first step %s call was %.80q, want its first segment's", s.name, calls[at].User)
+	}
+	lines := 0
+	for name, body := range testfixture.Files(t, runDir) {
+		if filepath.Base(name) == run.UsageFile {
+			lines += strings.Count(body, "\n")
 		}
-		at += len(s.prompts)
-		for _, dir := range s.dirs {
-			testfixture.SameRequests(t, filepath.Join(runDir, filepath.FromSlash(dir)), filepath.Join(recorded, filepath.FromSlash(dir)), "")
-		}
+	}
+	if lines != len(got) {
+		t.Errorf("the usage logs hold %d calls, want the %d made", lines, len(got))
 	}
 
-	// Every file the run wrote is the recorded run's, byte for byte, but the
-	// usage logs, which time and cost each call, and the run report, which
-	// links into the run folder.
-	got, want := testfixture.Files(t, runDir), testfixture.Files(t, recorded)
-	if !reflect.DeepEqual(keys(got), keys(want)) {
-		t.Fatalf("the run wrote %d files, want the recorded run's %d", len(got), len(want))
+	// Resumed with a vault, the run stages out what step 3.1's gate passed
+	// on, with the run report written for staging, and deletes the run
+	// folder.
+	checked, err := split.ReadFolders(at(run.FormattedOrFallbackNotes))
+	if err != nil {
+		t.Fatal(err)
 	}
-	for name, w := range want {
-		switch {
-		case filepath.Base(name) == run.UsageFile:
-			if g, w := strings.Count(got[name], "\n"), strings.Count(w, "\n"); g != w {
-				t.Errorf("%s logs %d calls, want the run's %d", name, g, w)
-			}
-		case name == run.RunReportDir+"/"+run.RunReportFile:
-			_, rest, _ := strings.Cut(w, "Links are to the run folder, `")
-			recordedDir, _, _ := strings.Cut(rest, "`")
-			if g := strings.ReplaceAll(got[name], runDir, recordedDir); recordedDir == "" || g != w {
-				t.Errorf("%s is not the run's, its run folder aside", name)
-			}
-		case got[name] != w:
-			t.Errorf("%s is not the recorded run's", name)
-		}
+	placed, _ := stageout.Place(src.Name, checked, nil)
+	want := map[string]string{stageout.RunReportFile: testfixture.Files(t, at(run.RunReportDir))[run.StagedReportFile]}
+	for _, pl := range placed {
+		want[pl.Path()] = pl.Text
 	}
-
 	vault := filepath.Join(t.TempDir(), "vault")
 	if err := os.MkdirAll(filepath.Join(vault, stageout.SlipBoxDir), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	none := testfixture.Replay(t, nil, nil)
+	none := testfixture.Serve(t)
 	stderr.Reset()
 	if code := runCommand(context.Background(), []string{"resume", "-vault", vault, runDir}, &stdout, &stderr, none); code != 0 || len(none.Calls()) != 0 {
 		t.Fatalf("resume: exit %d with %d calls, want 0 with none: %s", code, len(none.Calls()), stderr.String())
 	}
+	if w := fmt.Sprintf("The run's %d model calls cost $", len(got)); !strings.Contains(stderr.String(), w) {
+		t.Errorf("stderr %q does not say %q", stderr.String(), w)
+	}
 	if _, err := os.Stat(runDir); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("the run folder is not deleted (stat: %v)", err)
 	}
-	if got, want := testfixture.Files(t, stageout.DefaultStaging(vault, src.Name)), testfixture.Files(t, testfixture.PragmatismStaged(t)); !reflect.DeepEqual(got, want) {
-		t.Errorf("staged %d files, not the run's %d byte for byte", len(got), len(want))
+	staged := testfixture.Files(t, stageout.DefaultStaging(vault, src.Name))
+	if _, ok := staged[stageout.ClashListFile]; !ok {
+		t.Errorf("the staging folder has no %s", stageout.ClashListFile)
 	}
-}
-
-func TestRunCommand_Usage(t *testing.T) {
-	for _, args := range [][]string{
-		nil, {"resume"}, {"run"}, {"run", "a.md", "b.md"}, {"run", "-extract-effort", "auto", "a.md"},
-		{"run", "-repair-reply", "diff", "a.md"}, {"resume", "-stop-after", "1.4-repair-recheck", "dir"},
-	} {
-		var stdout, stderr bytes.Buffer
-		if code := runCommand(context.Background(), args, &stdout, &stderr, nil); code != 2 {
-			t.Errorf("runCommand(%q): exit %d, want 2", args, code)
+	delete(staged, stageout.ClashListFile)
+	if !reflect.DeepEqual(keys(staged), keys(want)) {
+		t.Fatalf("staged %q, want %q", keys(staged), keys(want))
+	}
+	for name, w := range want {
+		if staged[name] != w {
+			t.Errorf("staged %s:\n%s\nwant:\n%s", name, staged[name], w)
 		}
 	}
 }
 
-// -stage-1-model replaces stage 1's tier for steps 1.1 and 1.4's calls.
-func TestRunCommand_Stage1Model(t *testing.T) {
-	sourcePath := testfixture.SourcePath(t, testfixture.Pragmatism)
-	src := testfixture.PragmatismSource(t)
-	p, _ := pragmatismReplay(t, src, proposerStep)
-
-	runDir := filepath.Join(t.TempDir(), "run")
-	var stdout, stderr bytes.Buffer
-	if code := runCommand(context.Background(), []string{"run", "-run-dir", runDir, "-stop-after", run.LossProposerDir, "-stage-1-model", "sonnet", sourcePath}, &stdout, &stderr, p); code != 0 {
-		t.Fatalf("exit %d, want 0: %s", code, stderr.String())
-	}
+// stepCalls gives the calls of p briefed as step, as stepOf names it.
+func stepCalls(p *testfixture.Fake, step string) []provider.Request {
+	var out []provider.Request
 	for _, c := range p.Calls() {
-		if c.Model != "sonnet" {
-			t.Errorf("call for %q: model %q, want sonnet", c.User, c.Model)
+		if s, _ := stepOf(c); s == step {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// -stage-1-model replaces stage 1's tier for the steps run at it: step 1.1,
+// step 1.4's repair call and the kept-loss repair, which -repair-model
+// would otherwise set.
+func TestRunCommand_Stage1Model(t *testing.T) {
+	runDir, p, _ := lampRun(t, lampEveryStep(), "-stop-after", run.FinalDir, "-stage-1-model", "sonnet")
+	for _, step := range []string{run.ExtractDir, run.RepairDir, run.KeptLossDir} {
+		calls := stepCalls(p, step)
+		if len(calls) == 0 {
+			t.Errorf("step %s made no call", step)
+		}
+		for _, c := range calls {
+			if c.Model != "sonnet" {
+				t.Errorf("step %s call for %.60q: model %q, want sonnet", step, c.User, c.Model)
+			}
 		}
 	}
 	usage := testfixture.Files(t, filepath.Join(runDir, run.ExtractDir))[run.UsageFile]
-	if n := strings.Count(usage, "\n"); n != len(src.Segments) {
-		t.Errorf("usage log has %d lines, want one per call (%d)", n, len(src.Segments))
+	if n := strings.Count(usage, "\n"); n != 4 {
+		t.Errorf("usage log has %d lines, want one per call (4)", n)
 	}
 	if !strings.Contains(usage, `"step":"`+run.ExtractDir+`"`) || !strings.Contains(usage, `"model":"sonnet"`) {
 		t.Errorf("usage log does not name the step and model: %q", usage)
@@ -350,22 +296,13 @@ func TestRunCommand_Stage1Model(t *testing.T) {
 // other step's calls go at its own level, and every usage line records the
 // level its call went at.
 func TestRunCommand_ExtractEffort(t *testing.T) {
-	sourcePath := testfixture.SourcePath(t, testfixture.Pragmatism)
-	src := testfixture.PragmatismSource(t)
-	p, _ := pragmatismReplay(t, src, proposerStep)
-
-	runDir := filepath.Join(t.TempDir(), "run")
-	var stdout, stderr bytes.Buffer
-	if code := runCommand(context.Background(), []string{"run", "-run-dir", runDir, "-stop-after", run.LossProposerDir, "-extract-effort", "low", sourcePath}, &stdout, &stderr, p); code != 0 {
-		t.Fatalf("exit %d, want 0: %s", code, stderr.String())
-	}
-	extractPrompts := map[string]bool{}
-	for _, seg := range src.Segments {
-		extractPrompts[extract.Prompt(src, seg)] = true
+	runDir, p, _ := lampRun(t, lampEveryStep(), "-stop-after", run.FinalDir, "-extract-effort", "low")
+	if len(stepCalls(p, run.ExtractDir)) == 0 {
+		t.Fatal("step 1.1 made no call")
 	}
 	for _, c := range p.Calls() {
 		want := "medium"
-		if extractPrompts[c.User] {
+		if s, _ := stepOf(c); s == run.ExtractDir {
 			want = "low"
 		}
 		if c.Effort != want {
@@ -398,102 +335,48 @@ func TestRunCommand_ExtractEffort(t *testing.T) {
 	}
 }
 
-// With no flags, step 1.1 writes quote-once (ADR 0006), and step 1.4's
-// repair call asks for edits written quote-once, at stage 1's tier (ADR
-// 0007), as the Pragmatism run's calls did.
-func TestRunCommand_DefaultsToEditsQuoteOnce(t *testing.T) {
-	sourcePath := testfixture.SourcePath(t, testfixture.Pragmatism)
-	src := testfixture.PragmatismSource(t)
-	p, steps := pragmatismReplay(t, src, repairStep)
-
-	runDir := filepath.Join(t.TempDir(), "run")
-	var stdout, stderr bytes.Buffer
-	args := []string{"run", "-run-dir", runDir, "-stop-after", run.RepairDir, sourcePath}
-	if code := runCommand(context.Background(), args, &stdout, &stderr, p); code != 0 {
-		t.Fatalf("exit %d, want 0: %s", code, stderr.String())
-	}
-	brief := map[string]string{}
-	for _, u := range steps[extractStep].prompts {
-		brief[u] = briefs.Stage1QuoteOnce
-	}
-	for _, u := range steps[repairStep].prompts {
-		brief[u] = briefs.RepairEditsQuoteOnce + "\n\n" + briefs.Stage1QuoteOnce
-	}
-	if len(p.Calls()) != 30 {
-		t.Errorf("%d calls, want the run's 30 to the end of step 1.4", len(p.Calls()))
-	}
-	for _, c := range p.Calls() {
-		want, ok := brief[c.User]
-		if !ok {
-			continue
-		}
-		if c.Model != extract.DefaultModel || !strings.HasPrefix(c.System, want) {
-			t.Errorf("call for %.60q: model %q, or not briefed by the quote-once brief", c.User, c.Model)
-		}
-	}
-	if want := "Run s2n resume " + runDir + " to go on."; !strings.Contains(stderr.String(), want) {
-		t.Errorf("stderr %q does not say %q", stderr.String(), want)
-	}
-}
-
 // -repair-model and -repair-reply set step 1.4's repair call apart from stage
 // 1's tier, and -stop-after stops the run after step 1.4's re-check.
 // Resuming without the flags goes on through step 1.5.
 func TestRunCommand_RepairConfiguration(t *testing.T) {
-	sourcePath := testfixture.SourcePath(t, testfixture.Pragmatism)
-	src := testfixture.PragmatismSource(t)
-	steps := pragmatismSteps(t, src)
-	prompts, replies := replies(steps[:readsAloneRecheckStep+1]...)
-	p := testfixture.Replay(t, prompts, replies)
-
-	runDir := filepath.Join(t.TempDir(), "run")
-	var stdout, stderr bytes.Buffer
-	args := []string{"run", "-run-dir", runDir, "-repair-model", "sonnet", "-repair-reply", "edits", "-stop-after", run.ReadsAloneRecheckDir, sourcePath}
-	if code := runCommand(context.Background(), args, &stdout, &stderr, p); code != 0 {
-		t.Fatalf("exit %d, want 0: %s", code, stderr.String())
-	}
-	if !strings.Contains(stderr.String(), "stopped after "+run.ReadsAloneRecheckDir) {
-		t.Errorf("stderr %q does not say where the run stopped", stderr.String())
+	runDir, p, stderr := lampRun(t, lampEveryStep(), "-repair-model", "sonnet", "-repair-reply", "edits", "-stop-after", run.ReadsAloneRecheckDir)
+	if !strings.Contains(stderr, "stopped after "+run.ReadsAloneRecheckDir) {
+		t.Errorf("stderr %q does not say where the run stopped", stderr)
 	}
 	folder := &run.Folder{Dir: runDir}
 	if !folder.Complete(run.ReadsAloneRecheckDir) || folder.Complete(run.StillFailsDir) {
 		t.Fatalf("the run did not stop right after step 1.4's re-check")
 	}
-	// Step 1.1 keeps stage 1's tier, and the checkers their own.
-	model := map[string]string{}
-	for _, u := range steps[extractStep].prompts {
-		model[u] = extract.DefaultModel
-	}
-	for _, u := range steps[repairStep].prompts {
-		model[u] = "sonnet"
-	}
-	for _, c := range p.Calls() {
-		want, ok := model[c.User]
-		if ok && c.Model != want {
-			t.Errorf("call for %.60q: model %q, want %q", c.User, c.Model, want)
+	// Step 1.1 keeps stage 1's tier.
+	for _, c := range stepCalls(p, run.ExtractDir) {
+		if c.Model != extract.DefaultModel {
+			t.Errorf("step 1.1 call for %.60q: model %q, want %q", c.User, c.Model, extract.DefaultModel)
 		}
-		if ok && want == "sonnet" && !strings.HasPrefix(c.System, briefs.RepairEditsQuoteOnce) {
-			t.Errorf("repair call for %.60q is not briefed by the edit-shaped brief", c.User)
-		}
+	}
+	repairCalls := stepCalls(p, run.RepairDir)
+	if len(repairCalls) != 1 {
+		t.Fatalf("%d repair calls, want 1, segment 1's", len(repairCalls))
+	}
+	if c := repairCalls[0]; c.Model != "sonnet" || !strings.HasPrefix(c.System, testfixture.RepoFile(t, "internal/briefs/repair-edits-quote-once.md")+"\n\n") {
+		t.Errorf("repair call: model %q, or not briefed by the edit-shaped brief", c.Model)
 	}
 	if usage := testfixture.Files(t, filepath.Join(runDir, run.RepairDir))[run.UsageFile]; !strings.Contains(usage, `"model":"sonnet"`) || strings.Contains(usage, `"model":"opus"`) {
 		t.Errorf("step 1.4's usage log does not record sonnet alone:\n%s", usage)
 	}
 
-	resumed := testfixture.Replay(t, steps[proposerStep].prompts, steps[proposerStep].replies)
+	resumed := lampModel(t, runDir, lampEveryStep())
 	if code, errText := resumeTo(t, runDir, run.LossProposerDir, resumed); code != 0 {
 		t.Fatalf("resume: exit %d, want 0: %s", code, errText)
 	}
-	if n, want := len(resumed.Calls()), len(steps[proposerStep].prompts); n != want {
-		t.Errorf("resume made %d calls, want %d: step 1.5's", n, want)
+	if n, want := len(stepCalls(resumed, run.LossProposerDir)), len(resumed.Calls()); n != want || n != 6 {
+		t.Errorf("resume made %d calls, %d of them step 1.5's, want step 1.5's alone, two for each of 3 segments", want, n)
 	}
 }
 
 // -proposer-model sets the model of both of step 1.5's runs. Each 1.5 line
-// in the usage log records it, and the way on names it. With no flag, step 1.5 asks for its tier, Sonnet.
+// in the usage log records it, and the way on names it. With no flag, step
+// 1.5 asks for its tier, Sonnet.
 func TestRunCommand_ProposerModel(t *testing.T) {
-	sourcePath := testfixture.SourcePath(t, testfixture.Pragmatism)
-	src := testfixture.PragmatismSource(t)
 	for _, tc := range []struct {
 		name, model string
 		flags       []string
@@ -503,40 +386,101 @@ func TestRunCommand_ProposerModel(t *testing.T) {
 		{"opus", "opus", []string{"-proposer-model", "opus"}, "s2n resume -proposer-model opus "},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			p, steps := pragmatismReplay(t, src, proposerStep)
-			runDir := filepath.Join(t.TempDir(), "run")
-			var stdout, stderr bytes.Buffer
-			args := append([]string{"run", "-run-dir", runDir, "-stop-after", run.LossProposerDir}, tc.flags...)
-			if code := runCommand(context.Background(), append(args, sourcePath), &stdout, &stderr, p); code != 0 {
-				t.Fatalf("exit %d, want 0: %s", code, stderr.String())
-			}
-			proposer := map[string]bool{}
-			for _, u := range steps[proposerStep].prompts {
-				proposer[u] = true
-			}
-			calls := p.Calls()
-			if prompts, _ := replies(steps...); len(calls) != len(prompts) {
-				t.Fatalf("%d calls, want %d", len(calls), len(prompts))
+			runDir, p, stderr := lampRun(t, nil, append([]string{"-stop-after", run.LossProposerDir}, tc.flags...)...)
+			calls := stepCalls(p, run.LossProposerDir)
+			if len(calls) != 6 {
+				t.Fatalf("%d step 1.5 calls, want two for each of 3 segments", len(calls))
 			}
 			for _, c := range calls {
-				if proposer[c.User] && c.Model != tc.model {
+				if c.Model != tc.model {
 					t.Errorf("step 1.5 call for %.60q: model %q, want %q", c.User, c.Model, tc.model)
 				}
 			}
 			usage := testfixture.Files(t, filepath.Join(runDir, run.LossProposerDir))[run.UsageFile]
 			lines := strings.Split(strings.TrimSuffix(usage, "\n"), "\n")
-			if want := len(steps[proposerStep].prompts); len(lines) != want {
-				t.Fatalf("step 1.5's usage log has %d lines, want one per call (%d)", len(lines), want)
+			if len(lines) != len(calls) {
+				t.Fatalf("step 1.5's usage log has %d lines, want one per call (%d)", len(lines), len(calls))
 			}
 			for _, l := range lines {
 				if !strings.Contains(l, `"model":"`+tc.model+`"`) {
 					t.Errorf("usage line does not record %s: %s", tc.model, l)
 				}
 			}
-			if want := "Run " + tc.way + runDir + " to go on."; !strings.Contains(stderr.String(), want) {
-				t.Errorf("stderr %q does not say %q", stderr.String(), want)
+			if want := "Run " + tc.way + runDir + " to go on."; !strings.Contains(stderr, want) {
+				t.Errorf("stderr %q does not say %q", stderr, want)
 			}
 		})
+	}
+}
+
+// -repair-model sets the kept-loss repair's model as well as step 1.4's
+// repair call's, and step 1.1 keeps stage 1's tier.
+func TestRunCommand_RepairModelSetsTheKeptLossRepair(t *testing.T) {
+	_, p, _ := lampRun(t, lampEveryStep(), "-repair-model", "sonnet", "-stop-after", run.FinalDir)
+	calls := stepCalls(p, run.KeptLossDir)
+	if len(calls) != 1 {
+		t.Fatalf("%d kept-loss calls, want 1, segment 1's", len(calls))
+	}
+	if calls[0].Model != "sonnet" {
+		t.Errorf("kept-loss call: model %q, want sonnet", calls[0].Model)
+	}
+	for _, c := range stepCalls(p, run.ExtractDir) {
+		if c.Model != extract.DefaultModel {
+			t.Errorf("step 1.1 call for %.60q: model %q, want %q", c.User, c.Model, extract.DefaultModel)
+		}
+	}
+}
+
+// A run that can reach step 3.2 with no vault stops before it runs a step,
+// so it spends no model call on notes it can't stage, and says what to do.
+func TestRun_NoVaultStopsBeforeAnyCall(t *testing.T) {
+	t.Setenv(VaultEnv, "")
+	runDir := filepath.Join(t.TempDir(), "run")
+	p := testfixture.Serve(t)
+	var stdout, stderr bytes.Buffer
+	if code := runCommand(context.Background(), []string{"run", "-run-dir", runDir, lampSourcePath(t)}, &stdout, &stderr, p); code != 1 || len(p.Calls()) != 0 {
+		t.Fatalf("exit %d with %d calls, want 1 with none: %s", code, len(p.Calls()), stderr.String())
+	}
+	if want := "Give -vault DIR or set $" + VaultEnv + ", then run s2n resume " + runDir + ".\n"; !strings.HasSuffix(stderr.String(), want) {
+		t.Errorf("stderr %q does not end %q", stderr.String(), want)
+	}
+	if (&run.Folder{Dir: runDir}).Complete(run.ExtractDir) {
+		t.Error("step 1.1 ran")
+	}
+}
+
+// servePrompts returns a Fake that answers a call whose user prompt is
+// prompts[i] with replies[i], so a test on an invented source checks that
+// each step was given what the steps before it wrote, by giving no reply
+// to any other prompt: that fails the test, and the call. A prompt given
+// more than once is given its last reply.
+func servePrompts(t *testing.T, prompts, replies []string) *testfixture.Fake {
+	t.Helper()
+	if len(prompts) != len(replies) {
+		t.Fatalf("%d prompts for %d replies", len(prompts), len(replies))
+	}
+	m := map[string]string{}
+	for i, p := range prompts {
+		m[p] = replies[i]
+	}
+	return testfixture.NewFake(func(req provider.Request) (provider.Reply, error) {
+		if r, ok := m[req.User]; ok {
+			return provider.Reply{Text: r}, nil
+		}
+		t.Errorf("no reply for the user prompt %.80q", req.User)
+		return provider.Reply{}, fmt.Errorf("no reply for the user prompt %.80q", req.User)
+	})
+}
+
+func TestRunCommand_Usage(t *testing.T) {
+	for _, args := range [][]string{
+		nil, {"resume"}, {"run"}, {"run", "a.md", "b.md"}, {"run", "-extract-effort", "auto", "a.md"},
+		{"run", "-repair-reply", "diff", "a.md"}, {"resume", "-stop-after", "1.4-repair-recheck", "dir"},
+	} {
+		var stdout, stderr bytes.Buffer
+		if code := runCommand(context.Background(), args, &stdout, &stderr, nil); code != 2 {
+			t.Errorf("runCommand(%q): exit %d, want 2", args, code)
+		}
 	}
 }
 
@@ -545,8 +489,7 @@ func TestRunCommand_ProposerModel(t *testing.T) {
 // all. Step 1.4 is briefed by the traced edit-shaped brief, or with
 // -repair-reply whole by the whole-notes brief, at the model -repair-model
 // names, and the way on names every flag, since resume reads none from the
-// run folder. The source and replies are invented: the Pragmatism run was
-// made quote-once, with edits.
+// run folder.
 func TestRunCommand_QuoteOnceOff(t *testing.T) {
 	dir := t.TempDir()
 	sourcePath := filepath.Join(dir, "Tiny.md")
@@ -577,18 +520,18 @@ func TestRunCommand_QuoteOnceOff(t *testing.T) {
 			"=== EDIT: " + name + " ===\n--- REPLACE ---\nBeta is the second.[^2]\n--- WITH ---\nBeta is second.[^1]\n[^1]: [[Tiny#Alpha]] \"Beta is second.\"\n=== REPORT ===\nBeta's statement now reads as the source does.\n",
 			nil,
 			"-repair-model sonnet -quote-once=false",
-			briefs.RepairEdits,
+			"repair-edits.md",
 		},
 		{
 			"whole",
 			"=== FILE: " + name + " ===\n" + repaired.Render() + "=== REPORT ===\nBeta's statement now reads as the source does.\n",
 			[]string{"-repair-reply", "whole"},
 			"-repair-model sonnet -repair-reply whole -quote-once=false",
-			briefs.Repair,
+			"repair.md",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			p := testfixture.Replay(t,
+			p := servePrompts(t,
 				[]string{
 					extract.Prompt(src, seg),
 					supportcheck.Prompt([]*note.Note{extracted}, seg),
@@ -615,10 +558,11 @@ func TestRunCommand_QuoteOnceOff(t *testing.T) {
 			if len(calls) != 4 {
 				t.Fatalf("%d calls, want one per step to step 1.4 (4)", len(calls))
 			}
-			if !strings.HasPrefix(calls[0].System, briefs.Stage1+"\n\n=== FRAME: ") || calls[0].Model != extract.DefaultModel {
+			stage1 := testfixture.RepoFile(t, "internal/briefs/stage-1.md")
+			if !strings.HasPrefix(calls[0].System, stage1+"\n\n=== FRAME: ") || calls[0].Model != extract.DefaultModel {
 				t.Errorf("step 1.1's call: model %q, or not briefed by the traced stage 1 rules", calls[0].Model)
 			}
-			if !strings.HasPrefix(calls[3].System, tc.brief+"\n\n"+briefs.Stage1+"\n\n=== FRAME: ") || calls[3].Model != "sonnet" {
+			if !strings.HasPrefix(calls[3].System, testfixture.RepoFile(t, "internal/briefs/"+tc.brief)+"\n\n"+stage1+"\n\n=== FRAME: ") || calls[3].Model != "sonnet" {
 				t.Errorf("step 1.4's call: model %q, or not briefed by the %s brief and the traced stage 1 rules", calls[3].Model, tc.name)
 			}
 			if got := testfixture.Files(t, filepath.Join(runDir, filepath.FromSlash(run.ExtractNotes)))[name]; got != extracted.Render() {
@@ -629,17 +573,6 @@ func TestRunCommand_QuoteOnceOff(t *testing.T) {
 			}
 		})
 	}
-}
-
-// under returns the entries of files under dir/, keyed by the rest of the path.
-func under(files map[string]string, dir string) map[string]string {
-	out := map[string]string{}
-	for k, v := range files {
-		if rest, ok := strings.CutPrefix(k, dir+"/"); ok {
-			out[rest] = v
-		}
-	}
-	return out
 }
 
 func keys(m map[string]string) []string {
@@ -704,7 +637,7 @@ func TestRun_GoesUnattendedToStageOut(t *testing.T) {
 		return b.String() + "=== MANIFEST ===\n{}\n"
 	}
 
-	p := testfixture.Replay(t,
+	p := servePrompts(t,
 		[]string{
 			extract.Prompt(src, seg),
 			supportcheck.Prompt([]*note.Note{extracted}, seg),
@@ -1002,7 +935,7 @@ func TestRun_FallsBack(t *testing.T) {
 					want[n.Name] = n.Render()
 				}
 			}
-			p := testfixture.Replay(t, prompts, replies)
+			p := servePrompts(t, prompts, replies)
 
 			vault := filepath.Join(dir, "vault")
 			if err := os.MkdirAll(filepath.Join(vault, stageout.SlipBoxDir), 0o755); err != nil {
@@ -1061,11 +994,4 @@ func TestSteps_RunReportAfterTheFormatGate(t *testing.T) {
 	if !(at(run.FormatGateDir) >= 0 && at(run.RunReportDir) == at(run.FormatGateDir)+1 && at(run.StageOutDir) == at(run.RunReportDir)+1) {
 		t.Errorf("steps %q, want %s straight after %s, then %s", dirs, run.RunReportDir, run.FormatGateDir, run.StageOutDir)
 	}
-}
-
-// stepDirsBefore returns the directories of the steps before the step whose
-// directory is dir, in run order.
-func stepDirsBefore(dir string) []string {
-	dirs := stepDirs()
-	return dirs[:slices.Index(dirs, dir)]
 }

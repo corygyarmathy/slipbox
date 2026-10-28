@@ -13,7 +13,6 @@ import (
 
 	"github.com/corygyarmathy/slipbox/internal/provider"
 	"github.com/corygyarmathy/slipbox/internal/run"
-	"github.com/corygyarmathy/slipbox/internal/testfixture"
 	"github.com/corygyarmathy/slipbox/internal/usagelimit"
 )
 
@@ -69,8 +68,7 @@ func (r refuse) Call(ctx context.Context, req provider.Request) (provider.Reply,
 // 5-hour limit the stopped attempt found full holds step 1.1's next call
 // until it resets.
 func TestResume_TakesTheLatestReadingFromTheUsageLogs(t *testing.T) {
-	sourcePath := testfixture.SourcePath(t, testfixture.Pragmatism)
-	src := testfixture.PragmatismSource(t)
+	sourcePath := lampSourcePath(t)
 	runDir := filepath.Join(t.TempDir(), "run")
 	flags := []string{"-stop-after", run.ExtractDir}
 	var stdout, stderr bytes.Buffer
@@ -89,7 +87,7 @@ func TestResume_TakesTheLatestReadingFromTheUsageLogs(t *testing.T) {
 
 	c := &fakeClock{now: now}
 	useClock(t, c)
-	p, _ := pragmatismReplay(t, src, extractStep)
+	p := lampModel(t, runDir, nil)
 	stderr.Reset()
 	if code := runCommand(context.Background(), append(append([]string{"resume"}, flags...), runDir), &stdout, &stderr, p); code != 0 {
 		t.Fatalf("resume: exit %d, want 0: %s", code, stderr.String())
@@ -104,7 +102,7 @@ func TestResume_TakesTheLatestReadingFromTheUsageLogs(t *testing.T) {
 
 // Ctrl-C stops the run with the command that resumes it.
 func TestRun_InterruptedSaysHowToResume(t *testing.T) {
-	sourcePath := testfixture.SourcePath(t, testfixture.Pragmatism)
+	sourcePath := lampSourcePath(t)
 	runDir := filepath.Join(t.TempDir(), "run")
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -134,7 +132,7 @@ func (c interrupting) Wait(ctx context.Context, until time.Time) error {
 // Ctrl-C during a wait stops the run with the command that resumes it, and
 // the call that waited isn't logged, as it was never made.
 func TestRun_InterruptedWhileWaiting(t *testing.T) {
-	sourcePath := testfixture.SourcePath(t, testfixture.Pragmatism)
+	sourcePath := lampSourcePath(t)
 	runDir := filepath.Join(t.TempDir(), "run")
 	now := time.Date(2026, 10, 21, 9, 0, 0, 0, time.UTC)
 	oldUsage := accountUsage
@@ -165,7 +163,7 @@ func TestRun_InterruptedWhileWaiting(t *testing.T) {
 // A usage limit whose reset time can't be read stops the run, saying what
 // to do.
 func TestRun_UnreadableResetStopsTheRun(t *testing.T) {
-	sourcePath := testfixture.SourcePath(t, testfixture.Pragmatism)
+	sourcePath := lampSourcePath(t)
 	runDir := filepath.Join(t.TempDir(), "run")
 	var stdout, stderr bytes.Buffer
 	if code := runCommand(context.Background(), []string{"run", "-run-dir", runDir, "-stop-after", run.ExtractDir, sourcePath}, &stdout, &stderr, refuse{}); code != 1 {
