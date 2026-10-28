@@ -1,0 +1,24 @@
+=== SEGMENT 1 STAGE 1 NOTES ===
+--- NOTE: 1 The Keeper's Watch - Aside - The log.md ---
+# 1 The Keeper's Watch - Aside - The log
+
+The log was read by nobody until a ship was lost.[^1]
+Then they read every page.[^2]
+
+[^1]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Keeper’s Watch]] "The log was read by nobody until a ship was lost."
+[^2]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Keeper’s Watch]] "read every page"
+
+--- NOTE: 1 The Keeper's Watch.md ---
+# 1 The Keeper's Watch
+
+The watch began at dusk.[^1]
+He trimmed the wick every four hours.[^2]
+He logged the weather in a book.[^3]
+
+[^1]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Keeper’s Watch]] "The watch began at dusk."
+[^2]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Keeper’s Watch]] "trimmed the wick every four hours"
+[^3]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Keeper’s Watch]] "logged the weather in a book"
+
+=== END SEGMENT 1 STAGE 1 NOTES ===
+
+Hub title: `The Keeper's Watch`. Source file name for traces: `Lighthouses - Ch 2 - Keepers of the Lamp`.
