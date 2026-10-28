@@ -1,0 +1,1 @@
+Your segment: number 0, title `Keepers of the Lamp`, section heading `2. Keepers of the Lamp` (the text before the first `##` heading). Source file name for traces: `Lighthouses - Ch 2 - Keepers of the Lamp`.

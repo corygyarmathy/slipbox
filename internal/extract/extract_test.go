@@ -3,89 +3,204 @@ package extract_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/corygyarmathy/slipbox/internal/briefs"
 	"github.com/corygyarmathy/slipbox/internal/dropped"
 	"github.com/corygyarmathy/slipbox/internal/extract"
+	"github.com/corygyarmathy/slipbox/internal/note"
 	"github.com/corygyarmathy/slipbox/internal/provider"
 	"github.com/corygyarmathy/slipbox/internal/run"
 	"github.com/corygyarmathy/slipbox/internal/source"
 	"github.com/corygyarmathy/slipbox/internal/testfixture"
 )
 
-// genPrompt is the trialled stage 1 user prompt, transcribed.
-func genPrompt(n int, title, sec, srcname string) string {
-	clause := "."
-	if n == 0 {
-		clause = " (the text before the first `##` heading)."
-	}
-	return "Your segment: number " + strconv.Itoa(n) + ", title `" + title + "`, section heading `" + sec + "`" +
-		clause + " Source file name for traces: `" + srcname + "`."
-}
-
+// TestPrompt pins each segment's user prompt on the invented chapter: its
+// number, its title, which drops the heading's number and straightens its
+// apostrophe, its heading as written, the clause segment 0 gets for the
+// text before the first heading, and the source file name for traces.
 func TestPrompt(t *testing.T) {
-	// (title, heading) per segment, the titles the source model must give.
-	// The invented chapter's headings have a number and a curly apostrophe,
-	// which the titles drop and straighten.
-	chapters := map[string]struct {
-		src  *source.Source
-		segs [][2]string
-	}{
-		testfixture.Pragmatism: {testfixture.PragmatismSource(t), [][2]string{
-			{"What Pragmatism Means", "What Pragmatism Means"},
-			{"History of the Method", "History of the Method"},
-			{"The Method's Character and Affinities", "The Method's Character and Affinities"},
-			{"Pragmatism as a Theory of Truth", "Pragmatism as a Theory of Truth"},
-			{"The Formation of New Beliefs", "The Formation of New Beliefs"},
-			{"Rationalistic Criticisms", "Rationalistic Criticisms"},
-			{"Pragmatism as Mediator Between Empiricism and Religion", "Pragmatism as Mediator Between Empiricism and Religion"},
-			{"The True Is the Good in the Way of Belief", "The True Is the Good in the Way of Belief"},
-		}},
-		testfixture.Lamp: {testfixture.LampSource(t), [][2]string{
-			{"Keepers of the Lamp", "2. Keepers of the Lamp"},
-			{"The Keeper's Watch", "The Keeper’s Watch"},
-			{"The Lens", "The Lens"},
-			{"Storms", "Storms"},
-		}},
-	}
-	for name, c := range chapters {
-		t.Run(name, func(t *testing.T) {
-			var got, want []string
-			for _, seg := range c.src.Segments {
-				got = append(got, extract.Prompt(c.src, seg))
-			}
-			for n, s := range c.segs {
-				want = append(want, genPrompt(n, s[0], s[1], name))
-			}
-			if !reflect.DeepEqual(got, want) {
-				t.Errorf("prompts:\n got %q\nwant %q", got, want)
-			}
-		})
-	}
-	if got, want := genPrompt(0, "What Pragmatism Means", "What Pragmatism Means", testfixture.Pragmatism),
-		"Your segment: number 0, title `What Pragmatism Means`, section heading `What Pragmatism Means` (the text before the first `##` heading). Source file name for traces: `Pragmatism - Lecture II - What Pragmatism Means`."; got != want {
-		t.Errorf("genPrompt transcription drifted:\n got %q\nwant %q", got, want)
+	src := testfixture.LampSource(t)
+	for _, seg := range src.Segments {
+		testfixture.Golden(t, "prompt/"+strconv.Itoa(seg.Number)+".txt", extract.Prompt(src, seg))
 	}
 }
 
-// TestRun_ReplaysThePragmatismRun runs step 1.1 quote-once, as the recorded
-// run did, with its recorded replies: each call is the request the run made,
-// and the step writes one note per segment, traced by s2n.
-func TestRun_ReplaysThePragmatismRun(t *testing.T) {
-	src := testfixture.PragmatismSource(t)
-	recorded := filepath.Join(testfixture.PragmatismRun(t), run.ExtractDir)
-	var prompts []string
-	for _, seg := range src.Segments {
-		prompts = append(prompts, extract.Prompt(src, seg))
+// replyCase is a segment's reply and what Run should write from it.
+type replyCase struct {
+	name    string
+	segment int
+	reply   string
+	want    segmentWant
+}
+
+// segmentWant is what Run writes for one segment: its notes by file name,
+// its report, and what it dropped.
+type segmentWant struct {
+	notes   map[string]string
+	report  string
+	dropped []dropped.Item
+}
+
+// lampTrace is a footnote definition line: label's trace of quote into the
+// invented chapter's section.
+func lampTrace(label int, section, quote string) string {
+	return fmt.Sprintf("[^%d]: %s\n", label, testfixture.LampTrace(section, quote))
+}
+
+// renameLine is the line Run adds to a segment's report for a note it
+// renamed from from to to.
+func renameLine(from, to string) string {
+	return "\ns2n renamed `" + from + "` to `" + to + "`, and set its H1 to `# " + strings.TrimSuffix(to, ".md") +
+		"`: a segment's notes are named with its number.\n"
+}
+
+// badName is why Run drops a file named name, which isn't a note's: the
+// note package's reason.
+func badName(t *testing.T, name string) string {
+	t.Helper()
+	_, err := note.FileName(name)
+	if err == nil {
+		t.Fatalf("%q is a note's name", name)
 	}
-	replies := testfixture.RawReplies(t, recorded, len(src.Segments))
-	p := testfixture.Replay(t, prompts, replies)
+	return err.Error()
+}
+
+// replyCases are one quote-once reply per segment of the invented chapter,
+// each covering shapes of reply the step handles. Run makes one call per
+// segment, so a case that covers several deviations gives them in one
+// reply, and its name says which.
+func replyCases(t *testing.T) []replyCase {
+	return []replyCase{
+		// A well-formed reply: one note named with the segment's number, its
+		// statements written quote-once, which s2n traces into the
+		// segment's own section, joining text and a `{}` cut included. The
+		// report is kept as given.
+		{"well-formed, quote-once", 0, "=== FILE: 0 Keepers of the Lamp.md ===\n# 0 Keepers of the Lamp\n\n" +
+			"A lighthouse is a promise made to ships{, and} it burns whether or not a ship is near.\n" +
+			"The keeper kept that promise{} for the harbour.\n" +
+			"=== REPORT ===\nNo repairs.\n",
+			segmentWant{
+				notes: map[string]string{
+					"0 Keepers of the Lamp.md": "# 0 Keepers of the Lamp\n\n" +
+						"A lighthouse is a promise made to ships,[^1] and it burns whether or not a ship is near.[^2]\n" +
+						"The keeper kept that promise[^3] for the harbour.[^4]\n\n" +
+						lampTrace(1, "2. Keepers of the Lamp", "A lighthouse is a promise made to ships") +
+						lampTrace(2, "2. Keepers of the Lamp", "It burns whether or not a ship is near.") +
+						lampTrace(3, "2. Keepers of the Lamp", "The keeper kept that promise") +
+						lampTrace(4, "2. Keepers of the Lamp", "for the harbour."),
+				},
+				report: "No repairs.\n",
+			}},
+		// A main note named with a chapter heading's numbering, `4. `, gets
+		// the segment's number in its place, and an aside named with no
+		// number and no `.md` gets it in front: each with its H1 set to the
+		// new name, and a line for each in the report. The aside is traced
+		// by the generator, with no braces, and is written as given. The
+		// main note traces into a heading with a curly apostrophe its title
+		// straightens.
+		{"renamed main note and aside, a note the generator traced", 1, "=== FILE: 4. The Keeper's Watch.md ===\n# 4. The Keeper's Watch\n\n" +
+			"The watch began at dusk.\n" +
+			"The keeper{} trimmed the wick every four hours.\n" +
+			"=== FILE: The Keeper's Watch - Aside - The log ===\n# The Keeper's Watch - Aside - The log\n\n" +
+			"The log was read by nobody until a ship was lost.[^1]\n\n" +
+			lampTrace(1, "The Keeper’s Watch", "The log was read by nobody until a ship was lost.") +
+			"=== REPORT ===\nNo repairs.\n",
+			segmentWant{
+				notes: map[string]string{
+					"1 The Keeper's Watch.md": "# 1 The Keeper's Watch\n\n" +
+						"The watch began at dusk.[^1]\n" +
+						"The keeper[^2] trimmed the wick every four hours.[^3]\n\n" +
+						lampTrace(1, "The Keeper’s Watch", "The watch began at dusk.") +
+						lampTrace(2, "The Keeper’s Watch", "The keeper") +
+						lampTrace(3, "The Keeper’s Watch", "trimmed the wick every four hours"),
+					"1 The Keeper's Watch - Aside - The log.md": "# 1 The Keeper's Watch - Aside - The log\n\n" +
+						"The log was read by nobody until a ship was lost.[^1]\n\n" +
+						lampTrace(1, "The Keeper’s Watch", "The log was read by nobody until a ship was lost."),
+				},
+				report: "No repairs.\n" +
+					renameLine("4. The Keeper's Watch.md", "1 The Keeper's Watch.md") +
+					renameLine("The Keeper's Watch - Aside - The log.md", "1 The Keeper's Watch - Aside - The log.md"),
+			}},
+		// Every file Run can't write is dropped and listed, and the step
+		// goes on to the next: a name written twice, the second time
+		// without `.md`; a rename to a name the reply already wrote; names
+		// outside the notes directory; and a DELETE, which only a repair
+		// call may make. The first `2 The Lens.md` is the one written.
+		{"name written twice, rename to a doubled name, bad names, delete", 2, "=== FILE: 2 The Lens.md ===\n# 2 The Lens\n\n" +
+			"The lens bends light into a beam.\n" +
+			"=== FILE: 2 The Lens ===\n# 2 The Lens\n\nA beam carries farther than a glow.\n" +
+			"=== FILE: 4 The Lens.md ===\n# 4 The Lens\n\nA beam carries farther than a glow.\n" +
+			"=== FILE: ../escape.md ===\nx\n" +
+			"=== FILE: a/b.md ===\nx\n" +
+			"=== FILE: .. ===\nx\n" +
+			"=== DELETE: 2 The Lens - Aside - Prisms.md ===\n" +
+			"=== FILE: Glass.md ===\n# Glass\n\nA beam carries farther than a glow.\n" +
+			"=== REPORT ===\nDropped the Fresnel lens, as detail.\n",
+			segmentWant{
+				notes: map[string]string{
+					"2 The Lens.md": "# 2 The Lens\n\n" +
+						"The lens bends light into a beam.[^1]\n\n" +
+						lampTrace(1, "The Lens", "The lens bends light into a beam."),
+					"2 Glass.md": "# 2 Glass\n\n" +
+						"A beam carries farther than a glow.[^1]\n\n" +
+						lampTrace(1, "The Lens", "A beam carries farther than a glow."),
+				},
+				report: "Dropped the Fresnel lens, as detail.\n" + renameLine("Glass.md", "2 Glass.md"),
+				dropped: []dropped.Item{
+					{Segment: 2, Note: "2 The Lens.md", What: "the note", Why: "the reply writes it twice"},
+					{Segment: 2, Note: "2 The Lens.md", What: "the note", Why: `renamed from "4 The Lens.md", it is a name the reply already wrote`},
+					{Segment: 2, Note: "../escape.md", What: "the note", Why: badName(t, "../escape.md")},
+					{Segment: 2, Note: "a/b.md", What: "the note", Why: badName(t, "a/b.md")},
+					{Segment: 2, Note: "..", What: "the note", Why: badName(t, "..")},
+					{Segment: 2, Note: "2 The Lens - Aside - Prisms.md", What: "the note", Why: "the reply deletes it, which only a repair call may do"},
+				},
+			}},
+		// A note named with no number and with no H1 gets the number, and
+		// an H1. A statement sets the author's name, from the `source:`
+		// line, into a quote, as the generator writes `I, <the author>,`:
+		// the name is traced to the source, and the quote either side is
+		// one. `Glass.md`, which segment 2 wrote too, is kept under this
+		// segment's number: each segment's names are its own.
+		{"no number and no H1, the author's name in a quote, a name another segment wrote", 3, "=== FILE: Storms.md ===\n" +
+			"In a storm the light matters most.\n" +
+			"I{, }Rhea Vale{, }have stood in that lamp room in a gale, and the glass shook.\n" +
+			"=== FILE: Glass.md ===\n# Glass\n\nAnd the glass shook.\n" +
+			"=== REPORT ===\nr\n",
+			segmentWant{
+				notes: map[string]string{
+					"3 Storms.md": "# 3 Storms\n" +
+						"In a storm the light matters most.[^1]\n" +
+						"I, Rhea Vale,[^2] have stood in that lamp room in a gale, and the glass shook.[^3]\n\n" +
+						lampTrace(1, "Storms", "In a storm the light matters most.") +
+						"[^2]: [[" + testfixture.Lamp + "]] \"Rhea Vale\"\n" +
+						lampTrace(3, "Storms", "I have stood in that lamp room in a gale, and the glass shook."),
+					"3 Glass.md": "# 3 Glass\n\n" +
+						"And the glass shook.[^1]\n\n" +
+						lampTrace(1, "Storms", "and the glass shook."),
+				},
+				report: "r\n" + renameLine("Storms.md", "3 Storms.md") + renameLine("Glass.md", "3 Glass.md"),
+			}},
+	}
+}
+
+// TestRun runs step 1.1 quote-once, the default, on the invented chapter,
+// serving each segment its reply case, and checks the requests it made and
+// the notes, reports, raw replies and drops it wrote.
+func TestRun(t *testing.T) {
+	src := testfixture.LampSource(t)
+	cases := replyCases(t)
+	var serve []testfixture.Case
+	for _, c := range cases {
+		serve = append(serve, testfixture.Case{Contains: fmt.Sprintf("Your segment: number %d, ", c.segment), Reply: c.reply})
+	}
+	p := testfixture.Serve(t, serve...)
 	folder, err := run.New(filepath.Join(t.TempDir(), "run"))
 	if err != nil {
 		t.Fatal(err)
@@ -93,50 +208,117 @@ func TestRun_ReplaysThePragmatismRun(t *testing.T) {
 	if err := extract.Run(context.Background(), p, src, extract.DefaultModel, extract.DefaultEffort, true, folder); err != nil {
 		t.Fatal(err)
 	}
-	dir := filepath.Join(folder.Dir, run.ExtractDir)
-	testfixture.SameRequests(t, dir, recorded, "")
 
-	calls := p.Calls()
-	if len(calls) != len(src.Segments) || calls[0].User != prompts[0] {
-		t.Fatalf("%d calls, want %d, segment 0's first", len(calls), len(src.Segments))
+	files := testfixture.Files(t, filepath.Join(folder.Dir, run.ExtractDir))
+	drops := droppedItems(t, folder)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			n := strconv.Itoa(c.segment)
+			if got := files[run.RawDir+"/"+n+".txt"]; got != c.reply {
+				t.Errorf("segment %d: raw reply is not the reply:\n got %q\nwant %q", c.segment, got, c.reply)
+			}
+			if got := files[run.ReportsDir+"/"+n+".md"]; got != c.want.report {
+				t.Errorf("segment %d: report:\n got %q\nwant %q", c.segment, got, c.want.report)
+			}
+			got := map[string]string{}
+			for name, text := range under(files, run.NotesDir) {
+				if base := strings.TrimPrefix(name, run.NotesDir+"/"); strings.HasPrefix(base, n+" ") {
+					got[base] = text
+				}
+			}
+			if !reflect.DeepEqual(got, c.want.notes) {
+				t.Errorf("segment %d: notes:\n got %q\nwant %q", c.segment, got, c.want.notes)
+			}
+			var gotDrops []dropped.Item
+			for _, d := range drops {
+				if d.Segment == c.segment {
+					gotDrops = append(gotDrops, d)
+				}
+			}
+			if !reflect.DeepEqual(gotDrops, c.want.dropped) {
+				t.Errorf("segment %d: dropped:\n got %+v\nwant %+v", c.segment, gotDrops, c.want.dropped)
+			}
+		})
 	}
-	wantSystem := briefs.Stage1QuoteOnce + "\n\n=== FRAME: " + testfixture.Pragmatism + ".md ===\n" +
-		testfixture.PragmatismFrame(t) + "\n=== END FRAME ===\n"
+	var want int
+	for _, c := range cases {
+		want += len(c.want.notes)
+	}
+	if notes := under(files, run.NotesDir); len(notes) != want {
+		t.Errorf("%d notes written, want the cases' %d", len(notes), want)
+	}
+
+	brief := testfixture.RepoFile(t, "internal/briefs/stage-1-quote-once.md")
+	checkCalls(t, p.Calls(), src, brief)
+	if n := strings.Count(files[run.UsageFile], `"brief":"stage-1-quote-once.md"`); n != len(src.Segments) {
+		t.Errorf("%d usage records name the quote-once brief, want one per segment (%d)", n, len(src.Segments))
+	}
+}
+
+// TestRun_WithoutQuoteOnce runs step 1.1 as trialled before quote-once: the
+// generator is briefed to write the traces, and its notes are written as
+// given, braces too, as s2n traces nothing.
+func TestRun_WithoutQuoteOnce(t *testing.T) {
+	src := testfixture.LampSource(t)
+	traced := "# 0 Keepers of the Lamp\n\nA lighthouse is a promise made to ships.[^1]\n\n" +
+		lampTrace(1, "2. Keepers of the Lamp", "A lighthouse is a promise made to ships.")
+	braced := "# 1 The Keeper's Watch\n\nThe keeper{} trimmed the wick every four hours.\n"
+	p := testfixture.Serve(t,
+		testfixture.Case{Contains: "Your segment: number 0, ", Reply: "=== FILE: 0 Keepers of the Lamp.md ===\n" + traced + "=== REPORT ===\nr\n"},
+		testfixture.Case{Contains: "Your segment: number 1, ", Reply: "=== FILE: 1 The Keeper's Watch.md ===\n" + braced + "=== REPORT ===\nr\n"},
+		testfixture.Case{Contains: "Your segment: number 2, ", Reply: "=== REPORT ===\nr\n"},
+		testfixture.Case{Contains: "Your segment: number 3, ", Reply: "=== REPORT ===\nr\n"},
+	)
+	folder, err := run.New(filepath.Join(t.TempDir(), "run"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := extract.Run(context.Background(), p, src, extract.DefaultModel, extract.DefaultEffort, false, folder); err != nil {
+		t.Fatal(err)
+	}
+	files := testfixture.Files(t, filepath.Join(folder.Dir, run.ExtractDir))
+	want := map[string]string{
+		run.NotesDir + "/0 Keepers of the Lamp.md": traced,
+		run.NotesDir + "/1 The Keeper's Watch.md":  braced,
+	}
+	if got := under(files, run.NotesDir); !reflect.DeepEqual(got, want) {
+		t.Errorf("notes:\n got %q\nwant %q", got, want)
+	}
+
+	brief := testfixture.RepoFile(t, "internal/briefs/stage-1.md")
+	checkCalls(t, p.Calls(), src, brief)
+	if n := strings.Count(files[run.UsageFile], `"brief":"stage-1.md"`); n != len(src.Segments) {
+		t.Errorf("%d usage records name stage-1.md, want one per segment (%d)", n, len(src.Segments))
+	}
+}
+
+// checkCalls checks the requests of a step 1.1 run on the invented chapter:
+// one call per segment, the first segment 0's, each with brief and the
+// frame as its system prompt, at opus and medium, and with its segment's
+// prompt.
+func checkCalls(t *testing.T, calls []provider.Request, src *source.Source, brief string) {
+	t.Helper()
+	wantSystem := brief + "\n\n=== FRAME: " + testfixture.Lamp + ".md ===\n" + testfixture.LampChapter + "\n=== END FRAME ===\n"
+	if len(calls) != len(src.Segments) {
+		t.Fatalf("%d calls, want one per segment (%d)", len(calls), len(src.Segments))
+	}
+	var users []string
 	for _, c := range calls {
-		if c.System != wantSystem || c.Model != "opus" || c.Effort != "medium" {
-			t.Errorf("call for %.60q: not the quote-once brief and the frame, at opus and medium", c.User)
+		if c.System != wantSystem {
+			t.Errorf("call for %q: system prompt is not the brief and the frame", c.User)
 		}
-	}
-
-	files := testfixture.Files(t, dir)
-	notes := under(files, run.NotesDir)
-	if len(notes) != len(src.Segments) {
-		t.Errorf("%d notes, want one per segment: %d", len(notes), len(src.Segments))
+		if c.Model != "opus" || c.Effort != "medium" {
+			t.Errorf("call for %q: model %q at effort %q, want opus at medium", c.User, c.Model, c.Effort)
+		}
+		users = append(users, c.User)
 	}
 	for _, seg := range src.Segments {
-		n := strconv.Itoa(seg.Number)
-		if files[run.RawDir+"/"+n+".txt"] != replies[seg.Number] {
-			t.Errorf("%s: the raw reply is not kept as received", seg)
-		}
-		text, ok := notes[run.NotesDir+"/"+n+" "+seg.Title+".md"]
-		if !ok {
-			t.Errorf("%s: no note named for the segment", seg)
-			continue
-		}
-		// The replies are quote-once, with no footnotes; the notes s2n wrote
-		// trace every statement into the segment's own section.
-		if strings.Contains(replies[seg.Number], "[^1]:") {
-			t.Errorf("%s: the reply has footnotes, so s2n traced nothing", seg)
-		}
-		if !strings.Contains(text, "[^1]: [["+testfixture.Pragmatism+"#"+seg.Heading+"]] \"") {
-			t.Errorf("%s: the note's first trace is not into its section", seg)
+		if want := extract.Prompt(src, seg); !slices.Contains(users, want) {
+			t.Errorf("%s: no call has its prompt %q", seg, want)
 		}
 	}
-	if got := droppedItems(t, folder); len(got) != 0 {
-		t.Errorf("dropped %+v, want nothing", got)
-	}
-	if n := strings.Count(files[run.UsageFile], `"brief":"stage-1-quote-once.md"`); n != len(src.Segments) {
-		t.Errorf("%d usage records name the quote-once brief, want %d", n, len(src.Segments))
+	if want := extract.Prompt(src, src.Segments[0]); calls[0].User != want {
+		t.Errorf("first call was not segment 0's: %q", calls[0].User)
 	}
 }
 
@@ -186,113 +368,6 @@ func TestRun_InterruptedStepLeavesNoCompleteDirectory(t *testing.T) {
 	})
 }
 
-// A file whose name isn't a note's is dropped and listed, and the step goes
-// on.
-func TestRun_DropsNamesOutsideTheNotesDirectory(t *testing.T) {
-	src, err := source.Parse("T", "---\nsource: \"[[@T]]\"\n---\n\n## A\n\nText.\n")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range []string{"../escape.md", "a/b.md", ".."} {
-		t.Run(name, func(t *testing.T) {
-			folder, err := run.New(filepath.Join(t.TempDir(), "run"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			p := provider.NewReplay(map[string][]provider.Reply{
-				extract.Prompt(src, src.Segments[0]): {{Text: "=== FILE: 0 A.md ===\nx\n=== FILE: " + name + " ===\nx\n=== REPORT ===\nr\n"}},
-			})
-			if err := extract.Run(context.Background(), p, src, extract.DefaultModel, extract.DefaultEffort, false, folder); err != nil {
-				t.Fatal(err)
-			}
-			got := droppedItems(t, folder)
-			if len(got) != 1 || got[0].Note != name || got[0].Segment != 0 {
-				t.Errorf("dropped %+v, want %q alone", got, name)
-			}
-			if notes := under(testfixture.Files(t, filepath.Join(folder.Dir, run.ExtractDir)), run.NotesDir); len(notes) != 1 {
-				t.Errorf("notes written: %q, want 0 A.md alone", notes)
-			}
-		})
-	}
-}
-
-// A note name written twice in one reply is dropped the second time and
-// listed. Two segments can't write the same name: each segment's notes are
-// named with its number.
-func TestRun_DropsANoteNameWrittenTwice(t *testing.T) {
-	src, err := source.Parse("T", "---\nsource: \"[[@T]]\"\n---\n\n## A\n\nText.\n\n## B\n\nText.\n")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Run("in one reply", func(t *testing.T) {
-		folder, err := run.New(filepath.Join(t.TempDir(), "run"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		p := provider.NewReplay(map[string][]provider.Reply{
-			extract.Prompt(src, src.Segments[0]): {{Text: "=== FILE: 0 A ===\nx\n=== FILE: 0 A.md ===\ny\n=== REPORT ===\nr\n"}},
-			extract.Prompt(src, src.Segments[1]): {{Text: "=== REPORT ===\nr\n"}},
-		})
-		if err := extract.Run(context.Background(), p, src, extract.DefaultModel, extract.DefaultEffort, false, folder); err != nil {
-			t.Fatal(err)
-		}
-		want := []dropped.Item{{Segment: 0, Note: "0 A.md", What: "the note", Why: "the reply writes it twice"}}
-		if got := droppedItems(t, folder); !reflect.DeepEqual(got, want) {
-			t.Errorf("dropped %+v, want %+v", got, want)
-		}
-		if got := testfixture.Files(t, filepath.Join(folder.Dir, run.ExtractDir))[run.NotesDir+"/0 A.md"]; got != "x\n" {
-			t.Errorf("0 A.md = %q, want the first one written", got)
-		}
-	})
-	t.Run("by two segments", func(t *testing.T) {
-		folder, err := run.New(filepath.Join(t.TempDir(), "run"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		p := provider.NewReplay(map[string][]provider.Reply{
-			extract.Prompt(src, src.Segments[0]): {{Text: "=== FILE: N.md ===\nx\n=== REPORT ===\nr\n"}},
-			extract.Prompt(src, src.Segments[1]): {{Text: "=== FILE: N.md ===\ny\n=== REPORT ===\nr\n"}},
-		})
-		if err := extract.Run(context.Background(), p, src, extract.DefaultModel, extract.DefaultEffort, false, folder); err != nil {
-			t.Fatal(err)
-		}
-		files := testfixture.Files(t, filepath.Join(folder.Dir, run.ExtractDir))
-		if files[run.NotesDir+"/0 N.md"] != "# 0 N\nx\n" || files[run.NotesDir+"/1 N.md"] != "# 1 N\ny\n" {
-			t.Errorf("the two notes are not kept under their segments' numbers: %q, %q",
-				files[run.NotesDir+"/0 N.md"], files[run.NotesDir+"/1 N.md"])
-		}
-		if got := droppedItems(t, folder); len(got) != 0 {
-			t.Errorf("dropped %+v, want nothing", got)
-		}
-	})
-}
-
-// Only a repair call may delete a note: a DELETE line in a generator's reply
-// is dropped and listed, and the reply's notes are written.
-func TestRun_DropsADelete(t *testing.T) {
-	src, err := source.Parse("T", "---\nsource: \"[[@T]]\"\n---\n\n## A\n\nText.\n")
-	if err != nil {
-		t.Fatal(err)
-	}
-	folder, err := run.New(filepath.Join(t.TempDir(), "run"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	p := provider.NewReplay(map[string][]provider.Reply{
-		extract.Prompt(src, src.Segments[0]): {{Text: "=== FILE: 0 A.md ===\nx\n=== DELETE: 0 A - Aside - B.md ===\n=== REPORT ===\nr\n"}},
-	})
-	if err := extract.Run(context.Background(), p, src, extract.DefaultModel, extract.DefaultEffort, false, folder); err != nil {
-		t.Fatal(err)
-	}
-	got := droppedItems(t, folder)
-	if len(got) != 1 || got[0].Note != "0 A - Aside - B.md" || !strings.Contains(got[0].Why, "deletes") {
-		t.Errorf("dropped %+v, want the DELETE", got)
-	}
-	if files := testfixture.Files(t, filepath.Join(folder.Dir, run.ExtractDir)); files[run.NotesDir+"/0 A.md"] != "x\n" {
-		t.Errorf("0 A.md not written")
-	}
-}
-
 // droppedItems reads what step 1.1 dropped in folder.
 func droppedItems(t *testing.T, folder *run.Folder) []dropped.Item {
 	t.Helper()
@@ -315,111 +390,6 @@ func under(files map[string]string, dir string) map[string]string {
 		}
 	}
 	return out
-}
-
-// With quote-once, the generator is briefed by the quote-once rules, and the
-// step writes the traces of the notes it writes quote-once. The raw reply is
-// kept as written.
-func TestRun_QuoteOnce(t *testing.T) {
-	src, err := source.Parse("T", "---\nsource: \"[[@T - An Author]]\"\n---\n\n## A\n\nThe text is here. More text follows.\n")
-	if err != nil {
-		t.Fatal(err)
-	}
-	folder, err := run.New(filepath.Join(t.TempDir(), "run"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	reply := "=== FILE: 0 A.md ===\n# 0 A\n\nThe text is here{, and} more text follows.\n=== REPORT ===\nr\n"
-	p := provider.NewReplay(map[string][]provider.Reply{extract.Prompt(src, src.Segments[0]): {{Text: reply}}})
-	if err := extract.Run(context.Background(), p, src, extract.DefaultModel, extract.DefaultEffort, true, folder); err != nil {
-		t.Fatal(err)
-	}
-	if calls := p.Calls(); len(calls) != 1 || !strings.HasPrefix(calls[0].System, briefs.Stage1QuoteOnce) {
-		t.Errorf("the call is not briefed by the quote-once rules")
-	}
-	files := testfixture.Files(t, filepath.Join(folder.Dir, run.ExtractDir))
-	want := "# 0 A\n\nThe text is here,[^1] and more text follows.[^2]\n\n" +
-		"[^1]: [[T#A]] \"The text is here\"\n[^2]: [[T#A]] \"More text follows.\"\n"
-	if got := files[run.NotesDir+"/0 A.md"]; got != want {
-		t.Errorf("note:\n got %q\nwant %q", got, want)
-	}
-	if files[run.RawDir+"/0.txt"] != reply {
-		t.Errorf("the raw reply is not kept as written")
-	}
-	if !strings.Contains(files[run.UsageFile], `"brief":"stage-1-quote-once.md"`) {
-		t.Errorf("usage log does not name the quote-once brief:\n%s", files[run.UsageFile])
-	}
-}
-
-// A note named without its segment's number gets it, in place of the number
-// it has or in front of the name, with its H1 set to the new name, and the
-// segment's report says so. A note named with its number is written as given.
-func TestRun_SetsTheSegmentNumberOnANoteName(t *testing.T) {
-	src, err := source.Parse("T", "---\nsource: \"[[@T]]\"\n---\n\n## Tiny\n\nText.\n\n## B\n\nText.\n")
-	if err != nil {
-		t.Fatal(err)
-	}
-	folder, err := run.New(filepath.Join(t.TempDir(), "run"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	p := provider.NewReplay(map[string][]provider.Reply{
-		extract.Prompt(src, src.Segments[0]): {{Text: "=== FILE: 4 Tiny.md ===\n# 4 Tiny\n\nText.\n" +
-			"=== FILE: 4. Tiny - Aside - X ===\n# 4. Tiny - Aside - X\n\nText.\n=== REPORT ===\nNo repairs."}},
-		extract.Prompt(src, src.Segments[1]): {{Text: "=== FILE: B.md ===\nText.\n=== FILE: 1 B - Aside - Y.md ===\n# Y\n\nText.\n=== REPORT ===\nr\n"}},
-	})
-	if err := extract.Run(context.Background(), p, src, extract.DefaultModel, extract.DefaultEffort, false, folder); err != nil {
-		t.Fatal(err)
-	}
-	got := testfixture.Files(t, filepath.Join(folder.Dir, run.ExtractDir))
-	want := map[string]string{
-		run.NotesDir + "/0 Tiny.md":             "# 0 Tiny\n\nText.\n",
-		run.NotesDir + "/0 Tiny - Aside - X.md": "# 0 Tiny - Aside - X\n\nText.\n",
-		run.NotesDir + "/1 B.md":                "# 1 B\nText.\n",
-		run.NotesDir + "/1 B - Aside - Y.md":    "# Y\n\nText.\n",
-		run.ReportsDir + "/0.md": "No repairs.\n" +
-			"\ns2n renamed `4 Tiny.md` to `0 Tiny.md`, and set its H1 to `# 0 Tiny`: a segment's notes are named with its number.\n" +
-			"\ns2n renamed `4. Tiny - Aside - X.md` to `0 Tiny - Aside - X.md`, and set its H1 to `# 0 Tiny - Aside - X`: a segment's notes are named with its number.\n",
-		run.ReportsDir + "/1.md": "r\n" +
-			"\ns2n renamed `B.md` to `1 B.md`, and set its H1 to `# 1 B`: a segment's notes are named with its number.\n",
-	}
-	for name, w := range want {
-		if got[name] != w {
-			t.Errorf("%s:\n got %q\nwant %q", name, got[name], w)
-		}
-	}
-	var notes []string
-	for name := range got {
-		if strings.HasPrefix(name, run.NotesDir+"/") {
-			notes = append(notes, name)
-		}
-	}
-	if len(notes) != 4 {
-		t.Errorf("notes written: %q, want the four renamed or kept", notes)
-	}
-}
-
-// A rename that gives a note another note's name is dropped as a doubled
-// name.
-func TestRun_DropsARenameToANameWrittenTwice(t *testing.T) {
-	src, err := source.Parse("T", "---\nsource: \"[[@T]]\"\n---\n\n## A\n\nText.\n")
-	if err != nil {
-		t.Fatal(err)
-	}
-	folder, err := run.New(filepath.Join(t.TempDir(), "run"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	p := provider.NewReplay(map[string][]provider.Reply{
-		extract.Prompt(src, src.Segments[0]): {{Text: "=== FILE: 0 A.md ===\nx\n=== FILE: 4 A.md ===\ny\n=== REPORT ===\nr\n"}},
-	})
-	if err := extract.Run(context.Background(), p, src, extract.DefaultModel, extract.DefaultEffort, false, folder); err != nil {
-		t.Fatal(err)
-	}
-	want := []dropped.Item{{Segment: 0, Note: "0 A.md", What: "the note", Why: `renamed from "4 A.md", it is a name the reply already wrote`}}
-	if got := droppedItems(t, folder); !reflect.DeepEqual(got, want) {
-		t.Errorf("dropped %+v, want %+v", got, want)
-	}
 }
 
 func TestSegmentName(t *testing.T) {
