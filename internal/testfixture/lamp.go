@@ -10,12 +10,13 @@ import (
 	"github.com/corygyarmathy/slipbox/internal/run"
 	"github.com/corygyarmathy/slipbox/internal/source"
 	"github.com/corygyarmathy/slipbox/internal/split"
+	"github.com/corygyarmathy/slipbox/internal/striptraces"
 )
 
 // Lamp is the invented chapter's name, the source file name without .md.
 // The chapter, its stage 1 notes and their split are invented, so the tests
-// that read them, of the step 1.3 checks, step 2.1's gates, strip traces and
-// the format check among them, read no trial text.
+// that read them, of the step 1.3 checks, step 2.1's gates, strip traces,
+// step 3.1 and the format check among them, read no trial text.
 const Lamp = "Lighthouses - Ch 2 - Keepers of the Lamp"
 
 // LampChapter is the invented chapter: four segments, the first the text
@@ -238,6 +239,24 @@ func LampFolders(t testing.TB, files map[string]string) []split.SegmentFolder {
 		t.Fatalf("testfixture: %v", err)
 	}
 	return folders
+}
+
+// LampStripped gives LampSplit with its traces stripped, by slash-separated
+// path under `stage-2/`, as step 2.2 writes it once LampSplit passes its
+// gates: the notes step 3.1 formats and the format check takes as stage 2's.
+func LampStripped(t testing.TB) map[string]string {
+	t.Helper()
+	out := map[string]string{}
+	for _, f := range LampFolders(t, LampSplit()) {
+		for _, n := range f.Notes {
+			s, err := striptraces.Strip(n, LampCitekeyLink, f.IsHub(n))
+			if err != nil {
+				t.Fatalf("testfixture: %v", err)
+			}
+			out[f.Name+"/"+n.Name] = s.Render()
+		}
+	}
+	return out
 }
 
 // LampExtractRun makes a run folder for LampChapter whose step 1.1 wrote

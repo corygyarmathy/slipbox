@@ -2,6 +2,7 @@ package format_test
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -17,7 +18,6 @@ import (
 	"github.com/corygyarmathy/slipbox/internal/run"
 	"github.com/corygyarmathy/slipbox/internal/source"
 	"github.com/corygyarmathy/slipbox/internal/split"
-	"github.com/corygyarmathy/slipbox/internal/striptraces"
 	"github.com/corygyarmathy/slipbox/internal/testfixture"
 )
 
@@ -32,106 +32,237 @@ func atStripped(t *testing.T, src *source.Source, stripped map[string]string) *r
 	if err := folder.SaveSource(src.Name, []byte(src.Frame)); err != nil {
 		t.Fatal(err)
 	}
-	dir := filepath.Join(folder.Dir, filepath.FromSlash(run.StrippedNotes))
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	for rel, body := range stripped {
-		p := filepath.Join(dir, filepath.FromSlash(rel))
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
+	testfixture.WriteFiles(t, filepath.Join(folder.Dir, filepath.FromSlash(run.StrippedNotes)), stripped)
 	return folder
 }
 
-// stage3Prompt is segment n's user prompt as the run built it after the
-// frame, from the stripped notes' file text: the notes block of
-// every note in the segment's folder, dir, in sorted order.
-func stage3Prompt(stripped map[string]string, dir string, n int) string {
-	var names []string
-	for rel := range stripped {
-		if strings.HasPrefix(rel, dir+"/") {
-			names = append(names, rel)
-		}
-	}
-	slices.Sort(names)
-	label := "SEGMENT " + strconv.Itoa(n) + " STAGE 2 NOTES"
-	p := "=== " + label + " ===\n"
-	for _, rel := range names {
-		p += "--- NOTE: " + strings.TrimPrefix(rel, dir+"/") + " ---\n" + stripped[rel] + "\n"
-	}
-	return p + "=== END " + label + " ===\n\n"
-}
+// segment is the key a fake matches a segment's call on: the label its user
+// prompt gives the segment's notes.
+func segment(n int) string { return fmt.Sprintf("=== SEGMENT %d STAGE 2 NOTES ===", n) }
 
-// TestRun_ReplaysThePragmatismFormat runs step 2.2 on the notes the
-// Pragmatism run's step 2.1 gates passed on, then step 3.1 with the run's
-// recorded replies. Each call is the request the run made, so each
-// segment's folder holds the run's formatted notes byte for byte, its
-// manifest is kept, and no segment falls back. Every call is sent
-// stage3Prompt's prompt of the stripped notes, not the traced ones, and the
-// stage 3 brief and the frame as its system prompt, at the step's tier and
-// effort.
-func TestRun_ReplaysThePragmatismFormat(t *testing.T) {
-	src, recorded := testfixture.PragmatismSource(t), testfixture.PragmatismRun(t)
-	folder := testfixture.PragmatismFolder(t, run.SplitGatesDir)
-	if err := striptraces.Run(src, folder); err != nil {
-		t.Fatal(err)
-	}
-	stripped := testfixture.Files(t, filepath.Join(folder.Dir, filepath.FromSlash(run.StrippedNotes)))
-
-	var prompts []string
-	for n, seg := range src.Segments {
-		prompts = append(prompts, stage3Prompt(stripped, split.Folder(seg), n))
-	}
-	step := filepath.Join(recorded, run.FormatDir)
-	p := testfixture.Replay(t, prompts, testfixture.RawReplies(t, step, len(src.Segments)))
-	if err := format.Run(context.Background(), p, src, format.DefaultModel, folder); err != nil {
-		t.Fatal(err)
-	}
-	testfixture.SameRequests(t, filepath.Join(folder.Dir, run.FormatDir), step, "")
-
-	calls := p.Calls()
-	if len(calls) != len(src.Segments) {
-		t.Errorf("%d calls, want one per segment", len(calls))
-	}
-	frame := testfixture.PragmatismFrame(t)
-	wantSystem := testfixture.RepoFile(t, "internal/briefs/stage-3.md") + "\n\n=== FRAME: " + testfixture.Pragmatism + ".md ===\n" + frame + "\n=== END FRAME ===\n"
-	for _, c := range calls {
-		if c.Model != "haiku" || c.Effort != "medium" || c.System != wantSystem {
-			t.Errorf("call for %.40q: model %q at %q, or its system prompt is not stage-3.md and the frame", c.User, c.Model, c.Effort)
-		}
-		// A stripped note's one footnote is the source footnote, [^1].
-		if strings.Contains(c.User, "[^2]") || !strings.Contains(c.User, "[^1]: "+src.CitekeyLink+"\n") {
-			t.Errorf("call for %.40q: its notes are not the stripped ones", c.User)
-		}
-	}
-
-	got := testfixture.Files(t, filepath.Join(folder.Dir, run.FormatDir))
-	want := testfixture.Files(t, step)
-	for _, dir := range []string{run.Stage3NotesDir, run.ManifestsDir, run.RawDir} {
-		g, w := under(got, dir), under(want, dir)
-		if !reflect.DeepEqual(slices.Sorted(maps.Keys(g)), slices.Sorted(maps.Keys(w))) {
-			t.Errorf("%s/ holds %q, want the run's %q", dir, slices.Sorted(maps.Keys(g)), slices.Sorted(maps.Keys(w)))
-			continue
-		}
-		for name, text := range w {
-			if g[name] != text {
-				t.Errorf("%s/%s is not the run's", dir, name)
+// TestPrompt pins each segment's user prompt on the invented split, its
+// traces stripped: every note of the segment's folder, the hub among them.
+func TestPrompt(t *testing.T) {
+	stripped := testfixture.LampStripped(t)
+	for _, f := range testfixture.LampFolders(t, stripped) {
+		number, _, _ := strings.Cut(f.Name, " ")
+		got := format.Prompt(f)
+		testfixture.Golden(t, "prompt/"+number+".txt", got)
+		// The golden files can't say why a note is in the prompt: it is in
+		// the segment's folder.
+		for rel := range stripped {
+			dir, name, _ := strings.Cut(rel, "/")
+			if in, own := strings.Contains(got, "--- NOTE: "+name+" ---\n"), dir == f.Name; in != own {
+				t.Errorf("%s: %q in the prompt: %v, want %v", f.Name, rel, in, own)
 			}
 		}
 	}
-	if n := len(under(got, run.Stage3NotesDir)); n != len(stripped) {
-		t.Errorf("%d formatted notes, want one per stripped note (%d)", n, len(stripped))
+}
+
+// file is a reply's `=== FILE: <name> ===` block holding body.
+func file(name, body string) string { return "=== FILE: " + name + " ===\n" + body }
+
+// lampNote is the body of the note at path in LampStripped, the notes the
+// step is given, which a reply that changes nothing gives back.
+func lampNote(t *testing.T, path string) string {
+	t.Helper()
+	body, ok := testfixture.LampStripped(t)[path]
+	if !ok {
+		t.Fatalf("LampStripped has no %q", path)
 	}
-	if items, err := fallback.Read(folder, run.FormatDir); err != nil || len(items) != 0 {
-		t.Errorf("fallbacks %+v (err %v), want none", items, err)
+	return body
+}
+
+// replyCase is a segment's reply in TestRun, and what the step should write
+// for it.
+type replyCase struct {
+	name    string
+	segment int
+	reply   string
+	want    written
+}
+
+// written is what step 3.1 writes for a segment: its notes, by file name in
+// its folder, and its manifest; or, for a reply that falls back, neither,
+// and why it falls back.
+type written struct {
+	notes    map[string]string
+	manifest string
+	fallback string
+}
+
+// fresnel is `2 The Lens/Rings of Prisms.md` formatted: the source's
+// emphasis given as `_x_`, and its frontmatter kept.
+const fresnel = "---\ntags: [lighthouses]\n---\n# Rings of Prisms[^1]\n\n" +
+	"_The Fresnel lens_ uses rings of prisms instead of one thick glass.\n\n" +
+	"[^1]: " + testfixture.LampCitekeyLink + "\n"
+
+// replyCases are the replies of the invented chapter's four segments, one
+// call each.
+func replyCases(t *testing.T) []replyCase {
+	const whole = ", but it must give back every note of its segment, as named"
+	return []replyCase{
+		// A note given back under another name falls back, though the reply
+		// gives as many notes as the segment has: the notes are matched by
+		// name, not counted.
+		{"a renamed note falls back, though the count matches", 0,
+			file("A Lighthouse Is a Promise.md", lampNote(t, "0 Keepers of the Lamp/A Lighthouse Is a Promise.md")) +
+				file("Keepers of the Lamp.md", lampNote(t, "0 Keepers of the Lamp/Keepers of the Lamp.md")) +
+				file("The Keeper Kept His Promise.md", strings.Replace(lampNote(t, "0 Keepers of the Lamp/The Keeper Kept the Promise.md"), "Kept the", "Kept His", 1)) +
+				"=== MANIFEST ===\n{\"changes\": []}\n",
+			written{fallback: `step 3.1's reply left out ["The Keeper Kept the Promise.md"] and wrote ["The Keeper Kept His Promise.md"], not notes of the segment` + whole}},
+		// "No change" is a correct result: every note is written as it was.
+		// A preamble before the first file is no note; a note named without
+		// `.md` is written with it; the hub may come first, out of the
+		// prompt's order; a note given twice under one name is written once,
+		// with the later body; and a manifest with no trailing newline is
+		// kept as the runner parses its block: trimmed, with one trailing
+		// newline.
+		{"no change, a preamble, a name without .md, the hub first, a note given twice, and a manifest with no trailing newline", 1,
+			"No markup to change.\n\n" +
+				file("The Keeper's Watch.md", lampNote(t, "1 The Keeper's Watch/The Keeper's Watch.md")) +
+				file("The Log Was Read Only After a Wreck.md", "# The Log Was Read Only After a Wreck[^1]\n\nA first draft.\n") +
+				file("The Watch Began at Dusk", lampNote(t, "1 The Keeper's Watch/The Watch Began at Dusk.md")) +
+				file("The Log Was Read Only After a Wreck.md", lampNote(t, "1 The Keeper's Watch/The Log Was Read Only After a Wreck.md")) +
+				"=== MANIFEST ===\n\n{\"changes\": []}",
+			written{
+				notes: map[string]string{
+					"The Keeper's Watch.md":                  lampNote(t, "1 The Keeper's Watch/The Keeper's Watch.md"),
+					"The Log Was Read Only After a Wreck.md": lampNote(t, "1 The Keeper's Watch/The Log Was Read Only After a Wreck.md"),
+					"The Watch Began at Dusk.md":             lampNote(t, "1 The Keeper's Watch/The Watch Began at Dusk.md"),
+				},
+				manifest: "{\"changes\": []}\n",
+			}},
+		// The well-formed shape: every note, one with its markup changed,
+		// and a manifest, each written as given.
+		{"well-formed", 2,
+			file("The Lens.md", lampNote(t, "2 The Lens/The Lens.md")) +
+				file("The Lens Makes a Beam.md", lampNote(t, "2 The Lens/The Lens Makes a Beam.md")) +
+				file("A Keeper Need Not Watch the Lens.md", lampNote(t, "2 The Lens/A Keeper Need Not Watch the Lens.md")) +
+				file("Rings of Prisms.md", fresnel) +
+				"=== MANIFEST ===\n" + `{"changes": [{"note": "Rings of Prisms", "element": "_x_", "what": "*x* to _x_", "judgement": "mechanical", "why": "the source italicises it"}]}` + "\n",
+			written{
+				notes: map[string]string{
+					"The Lens.md":                         lampNote(t, "2 The Lens/The Lens.md"),
+					"The Lens Makes a Beam.md":            lampNote(t, "2 The Lens/The Lens Makes a Beam.md"),
+					"A Keeper Need Not Watch the Lens.md": lampNote(t, "2 The Lens/A Keeper Need Not Watch the Lens.md"),
+					"Rings of Prisms.md":                  fresnel,
+				},
+				manifest: `{"changes": [{"note": "Rings of Prisms", "element": "_x_", "what": "*x* to _x_", "judgement": "mechanical", "why": "the source italicises it"}]}` + "\n",
+			}},
+		// A note of another segment falls back, though the run has a note
+		// of that name: a reply may give back only its own segment's notes.
+		{"another segment's note falls back", 3,
+			file("Storms.md", lampNote(t, "3 Storms/Storms.md")) +
+				file("In a Storm the Light Matters Most.md", lampNote(t, "3 Storms/In a Storm the Light Matters Most.md")) +
+				file("The Keeper Stayed Through Every Gale.md", lampNote(t, "3 Storms/The Keeper Stayed Through Every Gale.md")) +
+				file("The Lens.md", lampNote(t, "2 The Lens/The Lens.md")) +
+				"=== MANIFEST ===\n{\"changes\": []}\n",
+			written{fallback: `step 3.1's reply wrote ["The Lens.md"], not notes of the segment` + whole}},
 	}
-	if n := strings.Count(got[run.UsageFile], `"brief":"stage-3.md"`); n != len(src.Segments) {
-		t.Errorf("usage log names stage-3.md %d times, want once per segment:\n%s", n, got[run.UsageFile])
+}
+
+// TestRun runs step 3.1 on the invented split, its traces stripped, with
+// replyCases, and checks the calls it made and what it wrote.
+func TestRun(t *testing.T) {
+	src := testfixture.LampSource(t)
+	stripped := testfixture.LampStripped(t)
+	folder := atStripped(t, src, stripped)
+	cases := replyCases(t)
+	var serve []testfixture.Case
+	for _, c := range cases {
+		serve = append(serve, testfixture.Case{Contains: segment(c.segment), Reply: c.reply})
+	}
+	p := testfixture.Serve(t, serve...)
+	if err := format.Run(context.Background(), p, src, format.DefaultModel, folder); err != nil {
+		t.Fatal(err)
+	}
+
+	files := testfixture.Files(t, filepath.Join(folder.Dir, run.FormatDir))
+	items, err := fallback.Read(folder, run.FormatDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wantItems []fallback.Item
+	wantFolders := map[string]bool{}
+	for _, c := range cases {
+		seg := src.Segments[c.segment]
+		n := strconv.Itoa(c.segment)
+		if c.want.fallback != "" {
+			wantItems = append(wantItems, fallback.Item{Segment: c.segment, Why: c.want.fallback})
+		} else {
+			wantFolders[split.Folder(seg)] = true
+		}
+		t.Run(c.name, func(t *testing.T) {
+			if got := files[run.RawDir+"/"+n+".txt"]; got != c.reply {
+				t.Errorf("raw reply is not the reply:\n got %q\nwant %q", got, c.reply)
+			}
+			if got := under(files, run.Stage3NotesDir+"/"+split.Folder(seg)); !maps.Equal(got, c.want.notes) {
+				t.Errorf("notes in %s/:\n got %q\nwant %q", split.Folder(seg), got, c.want.notes)
+			}
+			manifest, ok := files[run.ManifestsDir+"/"+n+".json"]
+			if c.want.fallback != "" && ok {
+				t.Errorf("a reply that falls back has a manifest %q", manifest)
+			}
+			if c.want.fallback == "" && manifest != c.want.manifest {
+				t.Errorf("manifest %q, want %q", manifest, c.want.manifest)
+			}
+			var why string
+			for _, it := range items {
+				if it.Segment == c.segment {
+					why = it.Why
+				}
+			}
+			if why != c.want.fallback {
+				t.Errorf("falls back for %q, want %q", why, c.want.fallback)
+			}
+		})
+	}
+	// Only the segments whose replies don't fall back have folders, and only
+	// segments 0 and 3 are listed as fallbacks, in whatever order.
+	got := map[string]bool{}
+	for path := range under(files, run.Stage3NotesDir) {
+		dir, _, _ := strings.Cut(path, "/")
+		got[dir] = true
+	}
+	if !reflect.DeepEqual(got, wantFolders) {
+		t.Errorf("%s/ holds folders %v, want %v", run.Stage3NotesDir, slices.Sorted(maps.Keys(got)), slices.Sorted(maps.Keys(wantFolders)))
+	}
+	bySegment := func(a, b fallback.Item) int { return a.Segment - b.Segment }
+	if slices.SortFunc(items, bySegment); !reflect.DeepEqual(items, wantItems) {
+		t.Errorf("fallbacks %+v, want %+v", items, wantItems)
+	}
+
+	// One call per segment, segment 0's first, each with its prompt,
+	// briefed by the stage 3 brief and the frame, at haiku and medium. The
+	// system prompt is built here rather than with modelstep.SystemPrompt,
+	// so a fault there still shows.
+	wantSystem := testfixture.RepoFile(t, "internal/briefs/stage-3.md") +
+		"\n\n=== FRAME: " + testfixture.Lamp + ".md ===\n" + testfixture.LampChapter + "\n=== END FRAME ===\n"
+	calls := p.Calls()
+	if len(calls) != len(src.Segments) {
+		t.Fatalf("%d calls, want one per segment (%d)", len(calls), len(src.Segments))
+	}
+	users := map[string]bool{}
+	for _, c := range calls {
+		if c.System != wantSystem {
+			t.Errorf("call for %.80q: system prompt is not stage-3.md and the frame", c.User)
+		}
+		if c.Model != "haiku" || c.Effort != "medium" {
+			t.Errorf("call for %.80q: model %q at effort %q, want haiku at medium", c.User, c.Model, c.Effort)
+		}
+		users[c.User] = true
+	}
+	for _, f := range testfixture.LampFolders(t, stripped) {
+		if want := format.Prompt(f); !users[want] {
+			t.Errorf("%s: no call has its prompt %q", f.Name, want)
+		}
+	}
+	if !strings.Contains(calls[0].User, segment(0)) {
+		t.Errorf("first call was not segment 0's: %.80q", calls[0].User)
+	}
+	if n := strings.Count(files[run.UsageFile], `"brief":"stage-3.md"`); n != len(src.Segments) {
+		t.Errorf("usage log names stage-3.md %d times, want once per segment:\n%s", n, files[run.UsageFile])
 	}
 }
 
@@ -177,7 +308,7 @@ func TestRun_NoChange(t *testing.T) {
 	reply := "=== FILE: Alpha Is First ===\n" + tinyStripped["0 Tiny/Alpha Is First.md"] +
 		"=== FILE: Tiny.md ===\n" + tinyStripped["0 Tiny/Tiny.md"] +
 		"=== MANIFEST ===\n{\"changes\": []}"
-	p := testfixture.Replay(t, []string{stage3Prompt(tinyStripped, "0 Tiny", 0)}, []string{reply})
+	p := testfixture.Serve(t, testfixture.Case{Contains: segment(0), Reply: reply})
 	if err := format.Run(context.Background(), p, src, "sonnet", folder); err != nil {
 		t.Fatal(err)
 	}
@@ -224,7 +355,7 @@ func TestRun_ABadReplyFallsBack(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			folder := atStripped(t, src, tinyStripped)
-			p := testfixture.Replay(t, []string{stage3Prompt(tinyStripped, "0 Tiny", 0)}, []string{c.reply})
+			p := testfixture.Serve(t, testfixture.Case{Contains: segment(0), Reply: c.reply})
 			if err := format.Run(context.Background(), p, src, format.DefaultModel, folder); err != nil {
 				t.Fatal(err)
 			}
@@ -254,7 +385,7 @@ func TestRun_NotStripped(t *testing.T) {
 	if err := os.Rename(filepath.Join(folder.Dir, run.StripDir), filepath.Join(folder.Dir, run.StripDir+run.PartialSuffix)); err != nil {
 		t.Fatal(err)
 	}
-	p := testfixture.Replay(t, nil, nil)
+	p := testfixture.Serve(t)
 	if err := format.Run(context.Background(), p, src, format.DefaultModel, folder); err == nil {
 		t.Errorf("no error")
 	}
@@ -278,7 +409,7 @@ func TestRun_EveryReplyFallsBackThenGate(t *testing.T) {
 	}
 	reply := "=== FILE: Alpha Is First ===\nx\n=== FILE: Alpha Is First.md ===\ny\n=== FILE: Tiny.md ===\nhub\n=== MANIFEST ===\n{}\n"
 	folder := atStripped(t, src, tinyStripped)
-	p := testfixture.Replay(t, []string{stage3Prompt(tinyStripped, "0 Tiny", 0)}, []string{reply})
+	p := testfixture.Serve(t, testfixture.Case{Contains: segment(0), Reply: reply})
 	if err := format.Run(context.Background(), p, src, format.DefaultModel, folder); err != nil {
 		t.Fatal(err)
 	}

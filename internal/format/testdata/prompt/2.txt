@@ -1,0 +1,35 @@
+=== SEGMENT 2 STAGE 2 NOTES ===
+--- NOTE: A Keeper Need Not Watch the Lens.md ---
+# A Keeper Need Not Watch the Lens[^1]
+
+Obviously, a keeper can take no notice of the lens on a clear night.
+On a foggy night it is no help at all.
+
+[^1]: [[@A History of Lighthouses - Rhea Vale]]
+
+--- NOTE: Rings of Prisms.md ---
+---
+tags: [lighthouses]
+---
+# Rings of Prisms[^1]
+
+*The Fresnel lens* uses rings of prisms instead of one thick glass.
+
+[^1]: [[@A History of Lighthouses - Rhea Vale]]
+
+--- NOTE: The Lens Makes a Beam.md ---
+# The Lens Makes a Beam[^1]
+
+The lens bends light into a beam. A beam carries farther than a glow.
+
+[^1]: [[@A History of Lighthouses - Rhea Vale]]
+
+--- NOTE: The Lens.md ---
+# The Lens
+
+1. [[The Lens Makes a Beam]]
+2. [[A Keeper Need Not Watch the Lens]]
+3. [[Rings of Prisms]]
+
+=== END SEGMENT 2 STAGE 2 NOTES ===
+
