@@ -3,21 +3,19 @@ package keptloss_test
 import (
 	"context"
 	"encoding/json"
-	"maps"
-	"os"
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/corygyarmathy/slipbox/internal/briefs"
 	"github.com/corygyarmathy/slipbox/internal/dropped"
 	"github.com/corygyarmathy/slipbox/internal/keptloss"
 	"github.com/corygyarmathy/slipbox/internal/lossproposer"
 	"github.com/corygyarmathy/slipbox/internal/mechcheck"
 	"github.com/corygyarmathy/slipbox/internal/note"
-	"github.com/corygyarmathy/slipbox/internal/provider"
 	"github.com/corygyarmathy/slipbox/internal/repair"
 	"github.com/corygyarmathy/slipbox/internal/run"
 	"github.com/corygyarmathy/slipbox/internal/source"
@@ -25,225 +23,373 @@ import (
 	"github.com/corygyarmathy/slipbox/internal/testfixture"
 )
 
-const tinySource = `---
-source: "[[@Tiny - A. Author]]"
----
-# 1. Tiny
-
-Alpha is first. Beta is second.
-
-## Two
-
-Gamma is third. Delta is fourth.
-`
-
-// Step 1.4's repaired notes: each segment's lost its second sentence.
+// The invented chapter's notes, by file name.
 const (
-	tinyNote0 = "# 0 Tiny\n\nAlpha is first.[^1]\n\n[^1]: [[Tiny#1. Tiny]] \"Alpha is first.\"\n"
-	tinyNote1 = "# 1 Two\n\nGamma is third.[^1]\n\n[^1]: [[Tiny#Two]] \"Gamma is third.\"\n"
-	// tinyNote0Beta is tinyNote0 with loss 0.1 added, as a reply gives it.
-	tinyNote0Beta = "# 0 Tiny\n\nAlpha is first.[^1] Beta is second.[^2]\n\n[^1]: [[Tiny#1. Tiny]] \"Alpha is first.\"\n[^2]: [[Tiny#1. Tiny]] \"Beta is second.\"\n"
+	watch  = "1 The Keeper's Watch.md"
+	aside  = "1 The Keeper's Watch - Aside - The log.md"
+	lens   = "2 The Lens.md"
+	storms = "3 Storms.md"
 )
 
-// tinyLosses are step 1.5's union: loss 0.1 in segment 0, and 1.1 and 1.2 in
-// segment 1.
-func tinyLosses() []lossproposer.Segment {
-	loss := func(idea string) lossproposer.Loss {
-		return lossproposer.Loss{Wordings: []lossproposer.Item{{Run: 1, Idea: idea, Quotes: []string{idea}, Why: "it's the argument"}}}
-	}
-	return []lossproposer.Segment{
-		{Segment: 0, Heading: "1. Tiny", Losses: []lossproposer.Loss{loss("Beta is second.")}, Other: []lossproposer.Line{}},
-		{Segment: 1, Heading: "Two", Losses: []lossproposer.Loss{loss("Delta is fourth."), loss("Gamma and Delta.")}, Other: []lossproposer.Line{}},
-	}
-}
+// Traces into the invented chapter's sections, as footnotes give them.
+func lensTrace(quote string) string   { return testfixture.LampTrace("The Lens", quote) }
+func stormsTrace(quote string) string { return testfixture.LampTrace("Storms", quote) }
 
-// afterProposer makes a run folder whose step 1.5 proposed the losses of
-// tinyLosses in the segments segs, or every segment's if segs is empty.
-func afterProposer(t *testing.T, segs ...int) (*source.Source, *run.Folder) {
+// keptCall and recheckCall are the keys a fake matches segment n's
+// kept-loss call and its step 1.3a re-check on: the labels their user
+// prompts give it. Neither holds the other.
+func keptCall(n int) string    { return fmt.Sprintf("YOUR SEGMENT'S NOTES (segment %d: ", n) }
+func recheckCall(n int) string { return fmt.Sprintf("YOUR SEGMENT'S NOTES TO CHECK (segment %d: ", n) }
+
+// isKeptCall says whether a request's user prompt is a kept-loss call's
+// rather than a re-check's.
+func isKeptCall(user string) bool { return strings.Contains(user, "=== KEPT LOSSES ===") }
+
+// proposedRun makes a run folder for the invented chapter whose step 1.4
+// repaired notes are LampStage1 and whose step 1.5 proposed losses.
+func proposedRun(t *testing.T, losses []lossproposer.Segment) (*source.Source, *run.Folder) {
 	t.Helper()
-	src, err := source.Parse("Tiny", tinySource)
-	if err != nil {
-		t.Fatal(err)
-	}
-	folder, err := run.New(filepath.Join(t.TempDir(), "run"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := folder.SaveSource(src.Name, []byte(src.Frame)); err != nil {
-		t.Fatal(err)
-	}
-	losses := tinyLosses()
-	for i := range losses {
-		if len(segs) > 0 && !slices.Contains(segs, losses[i].Segment) {
-			losses[i].Losses = []lossproposer.Loss{}
-		}
-	}
+	src, folder := testfixture.LampExtractRun(t)
+	testfixture.WriteFiles(t, filepath.Join(folder.Dir, filepath.FromSlash(run.RepairNotes)), testfixture.LampStage1())
 	b, err := json.Marshal(losses)
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, folder, b, run.LossProposerDir, run.ProposedLossesFile)
-	writeFile(t, folder, []byte(tinyNote0), run.RepairDir, run.NotesDir, "0 Tiny.md")
-	writeFile(t, folder, []byte(tinyNote1), run.RepairDir, run.NotesDir, "1 Two.md")
+	testfixture.WriteFiles(t, filepath.Join(folder.Dir, run.LossProposerDir), map[string]string{run.ProposedLossesFile: string(b)})
 	return src, folder
 }
 
-func writeFile(t *testing.T, folder *run.Folder, data []byte, rel ...string) {
-	t.Helper()
-	p := filepath.Join(append([]string{folder.Dir}, rel...)...)
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(p, data, 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func notes(t *testing.T, dir string) []*note.Note {
-	t.Helper()
-	ns, err := note.ReadDir(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return ns
-}
-
-// keptPrompt is segment n's kept-loss prompt on step 1.4's notes, with
-// every loss step 1.5 proposed in it.
-func keptPrompt(t *testing.T, src *source.Source, folder *run.Folder, n int) string {
-	t.Helper()
-	kept, err := keptloss.Losses(folder)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var mine []keptloss.Kept
-	for _, k := range kept {
-		if k.Segment == n {
-			mine = append(mine, k)
+// segmentNotes gives the notes in files, by file name, whose names start
+// with segment n's number.
+func segmentNotes(files map[string]string, n int) map[string]string {
+	out := map[string]string{}
+	for name, text := range files {
+		if strings.HasPrefix(name, strconv.Itoa(n)+" ") {
+			out[name] = text
 		}
 	}
-	return keptloss.Prompt(notes(t, filepath.Join(folder.Dir, run.RepairDir, run.NotesDir)), src.Segments[n], mine)
+	return out
 }
 
-// recheckPrompt is step 1.3a's prompt for segment n on notes, the notes as the
-// kept-loss call leaves them.
-func recheckPrompt(t *testing.T, src *source.Source, n int, texts map[string]string) string {
+// wantSystem is the system prompt of a kept-loss call on the invented
+// chapter briefed by brief, then rules, files in internal/briefs/. It is
+// built here rather than with keptloss.Brief, so a fault there still shows.
+func wantSystem(t *testing.T, brief, rules string) string {
 	t.Helper()
-	var ns []*note.Note
-	for _, name := range []string{"0 Tiny.md", "1 Two.md"} {
-		ns = append(ns, note.Parse(name, texts[name]))
+	return testfixture.RepoFile(t, "internal/briefs/"+brief) + "\n\n" + testfixture.RepoFile(t, "internal/briefs/"+rules) +
+		"\n\n=== FRAME: " + testfixture.Lamp + ".md ===\n" + testfixture.LampChapter + "\n=== END FRAME ===\n"
+}
+
+// briefFiles names each reply shape's brief, then its rules, files in
+// internal/briefs/, with quote-once and without. Whole notes have no
+// quote-once brief, so they are briefed as trialled with quote-once or
+// without.
+var briefFiles = map[bool]map[repair.Reply][2]string{
+	false: {repair.Whole: {"kept-loss.md", "stage-1.md"}, repair.Edits: {"kept-loss-edits.md", "stage-1.md"}},
+	true:  {repair.Whole: {"kept-loss.md", "stage-1.md"}, repair.Edits: {"kept-loss-edits-quote-once.md", "stage-1-quote-once.md"}},
+}
+
+// TestBrief checks each reply shape's brief against the brief files.
+func TestBrief(t *testing.T) {
+	for quoteOnce, shapes := range briefFiles {
+		for shape, files := range shapes {
+			file, got := keptloss.Brief(shape, quoteOnce)
+			want := testfixture.RepoFile(t, "internal/briefs/"+files[0]) + "\n\n" + testfixture.RepoFile(t, "internal/briefs/"+files[1])
+			if file != files[0] || got != want {
+				t.Errorf("Brief(%s, %v) is %s and its text, want %s, a blank line, then %s", shape, quoteOnce, file, files[0], files[1])
+			}
+		}
 	}
-	return supportcheck.Prompt(ns, src.Segments[n])
 }
 
-// runSegment0 runs the kept-loss repair with loss 0.1 proposed, serving reply to
-// its call and support to step 1.3a's re-check of the notes after.
-// It gives the number of calls made.
-func runSegment0(t *testing.T, reply, after0, support string) (*run.Folder, int, error) {
-	t.Helper()
-	folder, calls, err := runSegment0As(t, repair.Whole, reply, after0, support)
-	return folder, len(calls), err
+// runLosses are step 1.5's union for TestPrompt and TestRun. Segment 0 has
+// none. Segment 1 has two, the first worded by two runs, one of them with no
+// why. Segments 2 and 3 have one each.
+var runLosses = []lossproposer.Segment{
+	{Segment: 0, Heading: "2. Keepers of the Lamp", Losses: []lossproposer.Loss{}, Other: []lossproposer.Line{}},
+	{Segment: 1, Heading: "The Keeper’s Watch", Losses: []lossproposer.Loss{
+		{Wordings: []lossproposer.Item{
+			{Run: 1, Idea: "The keeper kept a weather log.", Quotes: []string{"logged the weather in a book"}, Why: "it says what the log held"},
+			{Run: 2, Idea: "The weather went into a book.", Quotes: []string{"logged the weather in a book"}},
+		}},
+		{Wordings: []lossproposer.Item{
+			{Run: 2, Idea: "Inspectors read the log only after a wreck.", Quotes: []string{"Then the inspectors read every page."}, Why: "it says who read the log"},
+		}},
+	}, Other: []lossproposer.Line{}},
+	{Segment: 2, Heading: "The Lens", Losses: []lossproposer.Loss{
+		{Wordings: []lossproposer.Item{{Run: 1, Idea: "The lens is named: the Fresnel lens.", Quotes: []string{"*The Fresnel lens*"}, Why: "the section names it"}}},
+	}, Other: []lossproposer.Line{}},
+	{Segment: 3, Heading: "Storms", Losses: []lossproposer.Loss{
+		{Wordings: []lossproposer.Item{{Run: 1, Idea: "The author has stood in the lamp room in a gale.", Quotes: []string{"I have stood in that lamp room in a gale, and the glass shook."}, Why: "the author's own witness"}}},
+	}, Other: []lossproposer.Line{}},
 }
 
-// runSegment0As is runSegment0 briefed for shape, giving the calls made.
-func runSegment0As(t *testing.T, shape repair.Reply, reply, after0, support string) (*run.Folder, []provider.Request, error) {
-	t.Helper()
-	src, folder := afterProposer(t, 0)
-	prompts := []string{keptPrompt(t, src, folder, 0), recheckPrompt(t, src, 0, map[string]string{"0 Tiny.md": after0, "1 Two.md": tinyNote1})}
-	p := testfixture.Replay(t, prompts, []string{reply, support})
-	err := keptloss.Run(context.Background(), p, src, "opus", shape, false, folder)
-	return folder, p.Calls(), err
+// keptOf gives the kept losses of runLosses in segment n, numbered as
+// keptloss.Losses numbers them. It is built here rather than with Losses, so
+// a fault there still shows.
+func keptOf(n int) []keptloss.Kept {
+	var out []keptloss.Kept
+	for _, seg := range runLosses {
+		if seg.Segment != n {
+			continue
+		}
+		for k, l := range seg.Losses {
+			out = append(out, keptloss.Kept{Segment: n, Number: k + 1, Loss: l})
+		}
+	}
+	return out
 }
 
+// TestPrompt pins each called segment's user prompt on LampStage1: the
+// segment's notes in full, then its kept losses, each with every run's
+// wording.
 func TestPrompt(t *testing.T) {
-	src, folder := afterProposer(t)
-	got := keptPrompt(t, src, folder, 1)
-	want := "=== YOUR SEGMENT'S NOTES (segment 1: Two) ===\n" +
-		"--- NOTE: 1 Two ---\n" + tinyNote1 + "\n" +
-		"=== END YOUR SEGMENT'S NOTES (segment 1: Two) ===\n\n" +
-		"=== KEPT LOSSES ===\n" +
-		"Loss 1.1\n\nRun 1: Delta is fourth.\n- Quote: \"Delta is fourth.\"\n- Why: it's the argument\n\n" +
-		"Loss 1.2\n\nRun 1: Gamma and Delta.\n- Quote: \"Gamma and Delta.\"\n- Why: it's the argument\n" +
-		"=== END KEPT LOSSES ===\n"
-	if got != want {
-		t.Errorf("Prompt:\n got %q\nwant %q", got, want)
+	src := testfixture.LampSource(t)
+	notes := testfixture.LampStage1Notes(t)
+	for _, n := range []int{1, 2, 3} {
+		got := keptloss.Prompt(notes, src.Segments[n], keptOf(n))
+		testfixture.Golden(t, "prompt/"+strconv.Itoa(n)+".txt", got)
 	}
 }
 
-// Only a segment with a proposed loss is called, with its losses. The new
-// statement passes its re-check, and a flag on a statement the notes already
-// had isn't listed. The step's usage log holds every call it made.
-func TestRun_ProposedLossesReachTheCall(t *testing.T) {
-	support := "# 0 Tiny\n\n- [weak] \"Alpha is first.\": thin\n\npass 1 / weak 1 / fail 0 / dangling 0 / outside-frame 0\n"
-	folder, calls, err := runSegment0(t, "=== FILE: 0 Tiny.md ===\n"+tinyNote0Beta+"=== REPORT ===\n- Loss 0.1: added.\n", tinyNote0Beta, support)
-	if err != nil {
+// runCase is a called segment's kept-loss reply in TestRun, its step 1.3a
+// re-check reply, and the notes, by file name, and report it should leave.
+type runCase struct {
+	name    string
+	segment int
+	reply   string
+	support string
+	notes   map[string]string
+	report  string
+}
+
+// runCases are the kept-loss replies of TestRun's three called segments, in
+// the default shape: edits, written quote-once.
+var runCases = []runCase{
+	// A reply that adds nothing leaves the notes as they were, and each of
+	// the segment's kept losses is listed as dropped. The re-check's flag that
+	// counts is on a statement the notes already had, so it isn't listed.
+	{"a reply that adds nothing; a flag on an old statement", 1,
+		"=== REPORT ===\n- Loss 1.1: already stated.\n- Loss 1.2: already in the aside.\n",
+		"# 1 The Keeper's Watch\n\n" +
+			"- [cut would do] \"He trimmed the wick…\": a cut to \"The keeper\" would name him.\n" +
+			"pass 2 / cut would do 1\n\n" +
+			"# 1 The Keeper's Watch - Aside - The log\n\npass 2\n",
+		segmentNotes(testfixture.LampStage1(), 1),
+		"- Loss 1.1: already stated.\n- Loss 1.2: already in the aside.\n"},
+	// A quote-once insert, traced by s2n. The re-check flags the new
+	// statement with a grade that counts beside one that doesn't, a statement
+	// the notes already had, and a quote no statement holds.
+	{"a quote-once insert; flags on a new, an old and no statement", 2,
+		"=== EDIT: " + lens + " ===\n" +
+			"--- AFTER ---\nIt uses rings of prisms instead of one thick glass.[^5]\n" +
+			"--- INSERT ---\n*The Fresnel lens* uses rings of prisms instead of one thick glass.\n" +
+			"=== REPORT ===\n- Loss 2.1: named the lens.\n",
+		"# 2 The Lens\n\n" +
+			"- [dangling / fail] \"*The Fresnel lens* uses rings…\": the section doesn't say it is the lens the keeper tends.\n" +
+			"- [weak] \"The lens bends light…\": thin.\n" +
+			"- [weak] \"The lamp is lit at dusk…\": thin.\n" +
+			"pass 4 / weak 2 / fail 1\n",
+		map[string]string{lens: "# 2 The Lens\n\n" +
+			"The lens bends light into a beam.[^1]\n" +
+			"A beam carries farther than a glow.[^2]\n" +
+			"Obviously, a keeper can take no notice of the lens on a clear night.[^3]\n" +
+			"On a foggy night it is no help at all.[^4]\n" +
+			"It uses rings of prisms instead of one thick glass.[^5] *The Fresnel lens* uses rings of prisms instead of one thick glass.[^6]\n\n" +
+			"[^1]: " + lensTrace("The lens bends light into a beam.") + "\n" +
+			"[^2]: " + lensTrace("A beam carries farther than a glow.") + "\n" +
+			"[^3]: " + lensTrace("Obviously, a keeper can take no notice of the lens on a clear night.") + "\n" +
+			"[^4]: " + lensTrace("On a foggy night it is no help at all.") + "\n" +
+			"[^5]: " + lensTrace("uses rings of prisms instead of one thick glass") + "\n" +
+			"[^6]: " + lensTrace("*The Fresnel lens* uses rings of prisms instead of one thick glass.") + "\n"},
+		"- Loss 2.1: named the lens.\n"},
+	// A quote-once insert of the author's first-person sentence with the
+	// author's name set into it, which s2n traces to the source line. The
+	// re-check's flag on it has only a grade step 1.3b governs, which doesn't
+	// count.
+	{"a quote-once insert with the author's name set in; a grade that doesn't count", 3,
+		"=== EDIT: " + storms + " ===\n" +
+			"--- AFTER ---\nHe stayed at the lamp (in 1839, for nine days) through every gale.[^3]\n" +
+			"--- INSERT ---\nI{, }Rhea Vale{, }have stood in that lamp room in a gale, and the glass shook.\n" +
+			"=== REPORT ===\n- Loss 3.1: added the author's account.\n",
+		"# 3 Storms\n\n" +
+			"- [outside-frame] \"I, Rhea Vale, have stood…\": the reader may not know the author.\n" +
+			"pass 4 / outside-frame 1\n",
+		map[string]string{storms: "# 3 Storms\n\n" +
+			"In a storm the light matters most.[^1]\n" +
+			"A wreck was his failure, whatever the weather.[^2]\n" +
+			"He stayed at the lamp (in 1839, for nine days) through every gale.[^3] I, Rhea Vale,[^4] have stood in that lamp room in a gale, and the glass shook.[^5]\n\n" +
+			"[^1]: " + stormsTrace("In a storm the light matters most.") + "\n" +
+			"[^2]: " + stormsTrace("failure, whatever the weather") + "\n" +
+			"[^3]: " + stormsTrace("stayed at the lamp (in 1839, for nine days) through every gale") + "\n" +
+			"[^4]: [[" + testfixture.Lamp + "]] \"Rhea Vale\"\n" +
+			"[^5]: " + stormsTrace("I have stood in that lamp room in a gale, and the glass shook.") + "\n"},
+		"- Loss 3.1: added the author's account.\n"},
+}
+
+// TestRun runs the kept-loss repair on runLosses in the default shape, with
+// its re-check, then the final notes, and checks the calls made and what
+// each wrote.
+func TestRun(t *testing.T) {
+	src, folder := proposedRun(t, runLosses)
+	var cases []testfixture.Case
+	for _, c := range runCases {
+		cases = append(cases, testfixture.Case{Contains: keptCall(c.segment), Reply: c.reply}, testfixture.Case{Contains: recheckCall(c.segment), Reply: c.support})
+	}
+	p := testfixture.Serve(t, cases...)
+	if err := keptloss.Run(context.Background(), p, src, "opus", repair.DefaultReply, true, folder); err != nil {
 		t.Fatal(err)
 	}
-	if calls != 2 {
-		t.Errorf("%d calls, want the kept-loss call and one re-check", calls)
+
+	files := testfixture.Files(t, filepath.Join(folder.Dir, run.KeptLossDir))
+	after := testfixture.Files(t, filepath.Join(folder.Dir, filepath.FromSlash(run.KeptLossNotes)))
+	for _, c := range runCases {
+		t.Run(c.name, func(t *testing.T) {
+			n := strconv.Itoa(c.segment)
+			if got := files[run.RawDir+"/"+n+".txt"]; got != c.reply {
+				t.Errorf("segment %d: raw reply is not the reply:\n got %q\nwant %q", c.segment, got, c.reply)
+			}
+			if got := files[run.ReportsDir+"/"+n+".md"]; got != c.report {
+				t.Errorf("segment %d: report %q, want %q", c.segment, got, c.report)
+			}
+			if got := segmentNotes(after, c.segment); !reflect.DeepEqual(got, c.notes) {
+				t.Errorf("segment %d: notes:\n got %q\nwant %q", c.segment, got, c.notes)
+			}
+		})
 	}
-	dir := filepath.Join(folder.Dir, run.KeptLossDir)
-	files := testfixture.Files(t, dir)
-	if files[run.NotesDir+"/0 Tiny.md"] != tinyNote0Beta || files[run.NotesDir+"/1 Two.md"] != tinyNote1 {
-		t.Errorf("notes are not the reply's and step 1.4's:\n%q\n%q", files[run.NotesDir+"/0 Tiny.md"], files[run.NotesDir+"/1 Two.md"])
+	// Segment 0, with no proposed loss, has no call and keeps step 1.4's
+	// notes.
+	if got, want := segmentNotes(after, 0), segmentNotes(testfixture.LampStage1(), 0); !reflect.DeepEqual(got, want) {
+		t.Errorf("segment 0's notes are not step 1.4's:\n got %q\nwant %q", got, want)
 	}
-	if files[run.ReportsDir+"/0.md"] != "- Loss 0.1: added.\n" {
-		t.Errorf("report 0 is %q", files[run.ReportsDir+"/0.md"])
+	for _, rel := range []string{run.RawDir + "/0.txt", run.ReportsDir + "/0.md"} {
+		if _, ok := files[rel]; ok {
+			t.Errorf("segment 0, with no proposed loss, has %s", rel)
+		}
 	}
-	if _, ok := files[run.ReportsDir+"/1.md"]; ok {
-		t.Errorf("segment 1, with no proposed loss, has a report")
-	}
+
+	// Every proposed loss is kept, in step 1.5's order.
 	var kept []keptloss.Kept
 	if err := json.Unmarshal([]byte(files[run.KeptLossesFile]), &kept); err != nil {
 		t.Fatal(err)
 	}
-	if len(kept) != 1 || kept[0].ID() != "0.1" {
-		t.Errorf("kept losses %+v, want 0.1 alone", kept)
+	if want := slices.Concat(keptOf(1), keptOf(2), keptOf(3)); !reflect.DeepEqual(kept, want) {
+		t.Errorf("kept losses:\n got %+v\nwant %+v", kept, want)
 	}
-	if files[run.StillFailsFile] != "[]\n" || files[run.DroppedFile] != "[]\n" {
-		t.Errorf("a passing re-check listed something:\n%s\n%s", files[run.StillFailsFile], files[run.DroppedFile])
+
+	// One kept-loss call per segment with a proposed loss, each with its own
+	// losses on step 1.4's notes, briefed by the quote-once edit brief and
+	// rules, at the model given and medium. Segment 1's, the first called,
+	// is made first. Each re-check call is at the check's tier.
+	system := wantSystem(t, "kept-loss-edits-quote-once.md", "stage-1-quote-once.md")
+	var keptUsers, recheckUsers []string
+	for _, c := range p.Calls() {
+		if !isKeptCall(c.User) {
+			if c.Model != supportcheck.Model || c.Effort != "medium" {
+				t.Errorf("re-check call for %.80q: model %q at effort %q, want %s at medium", c.User, c.Model, c.Effort, supportcheck.Model)
+			}
+			recheckUsers = append(recheckUsers, c.User)
+			continue
+		}
+		if c.System != system {
+			t.Errorf("call for %.80q: system prompt is not the quote-once kept-loss edit brief, the quote-once stage 1 rules and the frame", c.User)
+		}
+		if c.Model != "opus" || c.Effort != "medium" {
+			t.Errorf("call for %.80q: model %q at effort %q, want opus at medium", c.User, c.Model, c.Effort)
+		}
+		keptUsers = append(keptUsers, c.User)
 	}
+	if len(keptUsers) != len(runCases) {
+		t.Errorf("%d kept-loss calls, want one per segment with a proposed loss (%d)", len(keptUsers), len(runCases))
+	}
+	before := testfixture.LampStage1Notes(t)
+	for _, c := range runCases {
+		seg := src.Segments[c.segment]
+		if want := keptloss.Prompt(before, seg, keptOf(c.segment)); !slices.Contains(keptUsers, want) {
+			t.Errorf("%s: no kept-loss call has its prompt %q", seg, want)
+		}
+	}
+	if calls := p.Calls(); len(calls) == 0 || !strings.Contains(calls[0].User, keptCall(1)) {
+		t.Errorf("the first call was not segment 1's kept-loss call, the first called")
+	}
+
+	// The re-check runs step 1.3a once per segment with a kept loss, on the
+	// notes the call left. Its system prompt is the check's own, which
+	// supportcheck's tests pin, so only its notes are checked here: step
+	// 1.3a's user prompt names the notes, and the system prompt holds them.
+	afterNotes, err := note.ReadDir(filepath.Join(folder.Dir, filepath.FromSlash(run.KeptLossNotes)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range p.Calls() {
+		if !isKeptCall(c.User) && !strings.Contains(c.System, supportcheck.Shared(afterNotes)) {
+			t.Errorf("re-check call for %.80q: system prompt does not hold the kept-loss notes", c.User)
+		}
+	}
+	if len(recheckUsers) != len(runCases) {
+		t.Errorf("%d re-check calls, want one per segment with a kept loss (%d)", len(recheckUsers), len(runCases))
+	}
+	for _, c := range runCases {
+		seg := src.Segments[c.segment]
+		if want := supportcheck.Prompt(afterNotes, seg); !slices.Contains(recheckUsers, want) {
+			t.Errorf("%s: no re-check call has its prompt on the kept-loss notes %q", seg, want)
+		}
+	}
+
+	// The step's usage log holds every call it made, the re-check's
+	// included, and the re-check keeps none of its own. Steps 1.2 and 1.3a
+	// write their reports.
 	usage := files[run.UsageFile]
-	if strings.Count(usage, "\n") != 2 || !strings.Contains(usage, `"step":"`+run.KeptLossDir+`"`) || !strings.Contains(usage, `"step":"`+run.KeptLossSupportDir+`"`) {
-		t.Errorf("usage log does not hold both calls:\n%s", usage)
+	if n := strings.Count(usage, "\n"); n != len(p.Calls()) {
+		t.Errorf("usage log has %d lines, want one per call (%d):\n%s", n, len(p.Calls()), usage)
 	}
-	for _, rel := range []string{run.KeptLossMechanicalDir + "/" + run.ReportFile, run.KeptLossSupportDir + "/" + run.ReportsDir + "/0.md"} {
-		if _, ok := files[rel]; !ok {
-			t.Errorf("no re-check file %s", rel)
+	for _, s := range []string{`"step":"` + run.KeptLossDir + `"`, `"step":"` + run.KeptLossSupportDir + `"`, `"brief":"kept-loss-edits-quote-once.md"`} {
+		if !strings.Contains(usage, s) {
+			t.Errorf("usage log does not hold %s:\n%s", s, usage)
 		}
 	}
 	if _, ok := files[run.KeptLossSupportDir+"/"+run.UsageFile]; ok {
 		t.Errorf("the re-check kept a usage log of its own")
 	}
+	for _, rel := range []string{run.KeptLossMechanicalDir + "/" + run.ReportFile, run.KeptLossSupportDir + "/" + run.ReportsDir + "/3.md"} {
+		if _, ok := files[rel]; !ok {
+			t.Errorf("no re-check file %s", rel)
+		}
+	}
 
-	src, _ := source.Parse("Tiny", tinySource)
+	// Still fails lists the new statement step 1.3a fails, with that grade
+	// alone, and the flag no statement holds, since it may be on a new one.
+	// The flags on old statements and the grade that doesn't count aren't
+	// listed.
+	fails, items := still(t, folder)
+	wantFails := []repair.Entry{
+		{
+			File: lens, Statement: "*The Fresnel lens* uses rings of prisms instead of one thick glass.[^6]",
+			Traces: []string{"[^6]: " + lensTrace("*The Fresnel lens* uses rings of prisms instead of one thick glass.")},
+			Grades: []string{"fail"},
+			Flags:  []repair.Flag{{Step: repair.StepSupport, Grades: []string{"fail"}, Quote: "*The Fresnel lens* uses rings…", Reason: "the section doesn't say it is the lens the keeper tends."}},
+		},
+		{
+			File: lens, Quote: "The lamp is lit at dusk…", Traces: []string{}, Grades: []string{"weak"},
+			Flags: []repair.Flag{{Step: repair.StepSupport, Grades: []string{"weak"}, Quote: "The lamp is lit at dusk…", Reason: "thin."}},
+		},
+	}
+	if !reflect.DeepEqual(fails, wantFails) {
+		t.Errorf("still fails:\n got %+v\nwant %+v", fails, wantFails)
+	}
+	// Segment 1's notes gained no statement, so each of its kept losses is
+	// listed as dropped.
+	if want := []dropped.Item{unadded(1, 1), unadded(1, 2)}; !reflect.DeepEqual(items, want) {
+		t.Errorf("dropped:\n got %+v\nwant %+v", items, want)
+	}
+
+	// Nothing the call wrote is broken or untraced, so the final notes are
+	// the kept-loss repair's.
 	if err := keptloss.WriteFinal(src, folder); err != nil {
 		t.Fatal(err)
 	}
-	if got := testfixture.Files(t, filepath.Join(folder.Dir, filepath.FromSlash(run.FinalNotes))); !reflect.DeepEqual(got, testfixture.Files(t, filepath.Join(dir, run.NotesDir))) {
+	if got := testfixture.Files(t, filepath.Join(folder.Dir, filepath.FromSlash(run.FinalNotes))); !reflect.DeepEqual(got, after) {
 		t.Errorf("final notes are not the kept-loss repair's: %q", got)
-	}
-}
-
-// Every proposed loss is kept: each segment with one is called with all of
-// its own.
-func TestRun_EveryProposedLossIsKept(t *testing.T) {
-	src, folder := afterProposer(t)
-	two := tinyNote1 + "\nDelta is fourth.[^2]\n\n[^2]: [[Tiny#Two]] \"Delta is fourth.\"\n"
-	p := testfixture.Replay(t,
-		[]string{keptPrompt(t, src, folder, 0), keptPrompt(t, src, folder, 1),
-			recheckPrompt(t, src, 0, map[string]string{"0 Tiny.md": tinyNote0Beta, "1 Two.md": two}),
-			recheckPrompt(t, src, 1, map[string]string{"0 Tiny.md": tinyNote0Beta, "1 Two.md": two})},
-		[]string{"=== FILE: 0 Tiny.md ===\n" + tinyNote0Beta + "=== REPORT ===\nr\n", "=== FILE: 1 Two.md ===\n" + two + "=== REPORT ===\nr\n",
-			"# 0 Tiny\n\npass 2\n", "# 1 Two\n\npass 2\n"})
-	if err := keptloss.Run(context.Background(), p, src, "opus", repair.Whole, false, folder); err != nil {
-		t.Fatal(err)
-	}
-	if n := len(p.Calls()); n != 4 {
-		t.Errorf("%d calls, want 2 kept-loss calls and 2 re-checks", n)
-	}
-	if !strings.Contains(p.Calls()[1].User, "Loss 1.1\n") || !strings.Contains(p.Calls()[1].User, "Loss 1.2\n") {
-		t.Errorf("segment 1's call does not hold both its losses:\n%s", p.Calls()[1].User)
 	}
 }
 
@@ -265,212 +411,294 @@ func still(t *testing.T, folder *run.Folder) ([]repair.Entry, []dropped.Item) {
 	return fails, items
 }
 
-// A new statement with a step 1.3a grade that counts is listed, with that
-// grade alone, and stops nothing.
-func TestRun_NewStatementFailingSupportIsListed(t *testing.T) {
-	support := "# 0 Tiny\n\n- [fail] \"Beta is…\": not what the quote says\n"
-	folder, _, err := runSegment0(t, "=== FILE: 0 Tiny.md ===\n"+tinyNote0Beta+"=== REPORT ===\nAdded.\n", tinyNote0Beta, support)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fails, items := still(t, folder)
-	if len(fails) != 1 || fails[0].Statement != "Beta is second.[^2]" || !reflect.DeepEqual(fails[0].Grades, []string{"fail"}) || len(items) != 0 {
-		t.Errorf("still fails %+v, dropped %+v; want the new statement's fail alone", fails, items)
-	}
+// unadded is the dropped item for kept loss k of segment n, whose notes
+// gained no statement.
+func unadded(n, k int) dropped.Item {
+	id := strconv.Itoa(n) + "." + strconv.Itoa(k)
+	return dropped.Item{Segment: n, What: "loss " + id, Loss: id,
+		Why: "the kept-loss call added no statement to the segment's notes; its report is 1.4-kept-loss-repair/reports/" + strconv.Itoa(n) + ".md"}
 }
 
-// Step 1.3a's dangling and outside-frame grades don't count, on a new
-// statement or any other.
-func TestRun_ReadsAloneGradesArentListed(t *testing.T) {
-	support := "# 0 Tiny\n\n- [dangling] \"Beta is…\": which Beta\n"
-	folder, _, err := runSegment0(t, "=== FILE: 0 Tiny.md ===\n"+tinyNote0Beta+"=== REPORT ===\nAdded.\n", tinyNote0Beta, support)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if fails, _ := still(t, folder); len(fails) != 0 {
-		t.Errorf("still fails %+v, want nothing", fails)
-	}
+// segment3Losses are step 1.5's union with runLosses's segment 3 loss alone.
+var segment3Losses = []lossproposer.Segment{
+	{Segment: 0, Heading: "2. Keepers of the Lamp", Losses: []lossproposer.Loss{}, Other: []lossproposer.Line{}},
+	{Segment: 1, Heading: "The Keeper’s Watch", Losses: []lossproposer.Loss{}, Other: []lossproposer.Line{}},
+	{Segment: 2, Heading: "The Lens", Losses: []lossproposer.Loss{}, Other: []lossproposer.Line{}},
+	runLosses[3],
 }
 
-// A flag that matches no statement may be on a new one, so it is listed.
-func TestRun_UnmatchedFlagIsListed(t *testing.T) {
-	support := "# 0 Tiny\n\n- [weak] \"Zeta is…\": thin\n"
-	folder, _, err := runSegment0(t, "=== FILE: 0 Tiny.md ===\n"+tinyNote0Beta+"=== REPORT ===\nAdded.\n", tinyNote0Beta, support)
-	if err != nil {
+// The Storms note and the statement segment 3's kept loss adds, as a reply
+// writes them.
+var (
+	stormsNote = testfixture.LampStage1()[storms]
+	stood      = "I have stood in that lamp room in a gale, and the glass shook."
+	// stormsStood is stormsNote with stood added after its last statement,
+	// traced as [^4].
+	stormsStood = strings.Replace(stormsNote, "every gale.[^3]\n", "every gale.[^3] "+stood+"[^4]\n", 1) +
+		"[^4]: " + stormsTrace(stood) + "\n"
+	// stormsBroken is stormsStood with the new statement's trace quoting
+	// what the source doesn't say.
+	stormsBroken = strings.Replace(stormsStood, stormsTrace(stood), stormsTrace("I have stood in that lamp room in a storm."), 1)
+)
+
+// replyCase is segment 3's kept-loss reply, briefed for shape and
+// quoteOnce, the segment's notes it should leave, by file name, and what it
+// should drop.
+type replyCase struct {
+	name      string
+	shape     repair.Reply
+	quoteOnce bool
+	reply     string
+	notes     map[string]string
+	dropped   []dropped.Item
+}
+
+// replyCases are a reply per shape the step applies, then one per block or
+// edit it drops. Each is run alone, on segment3Losses, as segment 3's reply,
+// and its re-check passes.
+var replyCases = []replyCase{
+	// Whole notes: a FILE block replaces its note.
+	{name: "whole notes: the note in full", shape: repair.Whole,
+		reply: "=== FILE: " + storms + " ===\n" + stormsStood + "=== REPORT ===\nr\n",
+		notes: map[string]string{storms: stormsStood}},
+	// A new statement whose trace is broken is kept, and isn't listed as
+	// still failing: step 1.2's flags are the final notes' to act on
+	// (TestWriteFinal_DropsABrokenStatement).
+	{name: "whole notes: a new statement with a broken trace", shape: repair.Whole,
+		reply: "=== FILE: " + storms + " ===\n" + stormsBroken + "=== REPORT ===\nr\n",
+		notes: map[string]string{storms: stormsBroken}},
+	// Edits, made through the note model, may insert a statement.
+	{name: "edits: an insert", shape: repair.Edits,
+		reply: "=== EDIT: " + storms + " ===\n" +
+			"--- AFTER ---\nHe stayed at the lamp (in 1839, for nine days) through every gale.[^3]\n" +
+			"--- INSERT ---\n" + stood + "[^1]\n[^1]: " + stormsTrace(stood) + "\n" +
+			"=== REPORT ===\nr\n",
+		notes: map[string]string{storms: stormsStood}},
+	// Unlike step 1.4, the call may add a paragraph.
+	{name: "edits: a paragraph added", shape: repair.Edits,
+		reply: "=== EDIT: " + storms + " ===\n" +
+			"--- AFTER ---\nHe stayed at the lamp (in 1839, for nine days) through every gale.[^3]\n" +
+			"--- PARAGRAPH ---\n" + stood + "[^1]\n[^1]: " + stormsTrace(stood) + "\n" +
+			"=== REPORT ===\nr\n",
+		notes: map[string]string{storms: strings.Replace(stormsStood, "every gale.[^3] ", "every gale.[^3]\n\n", 1)}},
+	// With quote-once, a note given in full without footnotes is traced by
+	// s2n.
+	{name: "quote-once: the note in full traced", shape: repair.Edits, quoteOnce: true,
+		reply: "=== FILE: " + storms + " ===\n# 3 Storms\n\n" +
+			"In a storm the light matters most.\n" +
+			"{A wreck was his }failure, whatever the weather.\n" +
+			"{He }stayed at the lamp (in 1839, for nine days) through every gale.\n" +
+			stood + "\n" +
+			"=== REPORT ===\nr\n",
+		notes: map[string]string{storms: "# 3 Storms\n\n" +
+			"In a storm the light matters most.[^1]\n" +
+			"A wreck was his failure, whatever the weather.[^2]\n" +
+			"He stayed at the lamp (in 1839, for nine days) through every gale.[^3]\n" +
+			stood + "[^4]\n\n" +
+			"[^1]: " + stormsTrace("In a storm the light matters most.") + "\n" +
+			"[^2]: " + stormsTrace("failure, whatever the weather.") + "\n" +
+			"[^3]: " + stormsTrace("stayed at the lamp (in 1839, for nine days) through every gale.") + "\n" +
+			"[^4]: " + stormsTrace(stood) + "\n"}},
+	// The call adds statements and changes none, so an edit that replaces
+	// one is dropped, and the segment's kept loss with it.
+	{name: "an edit replacing a statement", shape: repair.Edits,
+		reply: "=== EDIT: " + storms + " ===\n--- REPLACE ---\nIn a storm the light matters most.[^1]\n--- WITH ---\n=== REPORT ===\nr\n",
+		notes: map[string]string{storms: stormsNote},
+		dropped: []dropped.Item{
+			{Segment: 3, Note: storms, What: `the edit at "In a storm the light matters most.[^1]"`, Why: "it replaces a statement, which this call may not do"},
+			unadded(3, 1),
+		}},
+	// The call rewrites only the segment's existing notes: any other block
+	// is dropped.
+	{name: "the note deleted", shape: repair.Edits,
+		reply: "=== DELETE: " + storms + " ===\n=== REPORT ===\nr\n",
+		notes: map[string]string{storms: stormsNote},
+		dropped: []dropped.Item{
+			{Segment: 3, Note: storms, What: "the reply's DELETE", Why: "the kept-loss call deletes no note"},
+			unadded(3, 1),
+		}},
+	{name: "a new note", shape: repair.Edits,
+		reply: "=== FILE: 3 Storms - Aside - The gale.md ===\n# 3 Storms - Aside - The gale\n\n" + stood + "\n=== REPORT ===\nr\n",
+		notes: map[string]string{storms: stormsNote},
+		dropped: []dropped.Item{
+			{Segment: 3, Note: "3 Storms - Aside - The gale.md", What: "the reply's FILE block", Why: "it is not a note; the kept-loss call adds no note"},
+			unadded(3, 1),
+		}},
+	// Another segment's note is a note, so only the segment's prefix keeps
+	// it out.
+	{name: "another segment's note", shape: repair.Edits,
+		reply: "=== FILE: " + lens + " ===\n# 2 The Lens\n\n" + stood + "\n=== REPORT ===\nr\n",
+		notes: map[string]string{storms: stormsNote},
+		dropped: []dropped.Item{
+			{Segment: 3, Note: lens, What: "the reply's FILE block", Why: "it is not one of the segment's notes"},
+			unadded(3, 1),
+		}},
+	// Which of an edit and a rewrite of one note comes first is not the
+	// reply's to say, so both blocks are dropped.
+	{name: "the note edited and given in full", shape: repair.Edits,
+		reply: "=== EDIT: " + storms + " ===\n" +
+			"--- AFTER ---\nHe stayed at the lamp (in 1839, for nine days) through every gale.[^3]\n" +
+			"--- INSERT ---\n" + stood + "[^1]\n[^1]: " + stormsTrace(stood) + "\n" +
+			"=== FILE: " + storms + " ===\n" + stormsStood + "=== REPORT ===\nr\n",
+		notes: map[string]string{storms: stormsNote},
+		dropped: []dropped.Item{
+			{Segment: 3, Note: storms, What: "the reply's EDIT block", Why: "the reply both edits the note and gives it in full or deletes it"},
+			{Segment: 3, Note: storms, What: "the reply's FILE block", Why: "the reply both edits the note and gives it in full or deletes it"},
+			unadded(3, 1),
+		}},
+}
+
+// runSegment3 runs the kept-loss repair on segment3Losses, briefed for
+// shape and quoteOnce, serving reply to segment 3's call and a passing
+// report to its re-check.
+func runSegment3(t *testing.T, shape repair.Reply, quoteOnce bool, reply string) (*source.Source, *run.Folder, *testfixture.Fake) {
+	t.Helper()
+	src, folder := proposedRun(t, segment3Losses)
+	p := testfixture.Serve(t,
+		testfixture.Case{Contains: keptCall(3), Reply: reply},
+		testfixture.Case{Contains: recheckCall(3), Reply: "# 3 Storms\n\npass\n"})
+	if err := keptloss.Run(context.Background(), p, src, "opus", shape, quoteOnce, folder); err != nil {
 		t.Fatal(err)
 	}
-	if fails, _ := still(t, folder); len(fails) != 1 || fails[0].Statement != "" || fails[0].Quote != "Zeta is…" {
-		t.Errorf("still fails %+v, want the unmatched flag", fails)
+	return src, folder, p
+}
+
+// TestRun_Replies runs the kept-loss repair with each reply case as segment
+// 3's reply, the only one called, and checks the call and what the step
+// wrote.
+func TestRun_Replies(t *testing.T) {
+	for _, c := range replyCases {
+		t.Run(c.name, func(t *testing.T) {
+			_, folder, p := runSegment3(t, c.shape, c.quoteOnce, c.reply)
+
+			files := briefFiles[c.quoteOnce][c.shape]
+			var kept int
+			for _, call := range p.Calls() {
+				if !isKeptCall(call.User) {
+					continue
+				}
+				kept++
+				if call.System != wantSystem(t, files[0], files[1]) {
+					t.Errorf("the call is not briefed by %s and %s, then the frame", files[0], files[1])
+				}
+			}
+			if kept != 1 {
+				t.Errorf("%d kept-loss calls, want 1: only segment 3 has a proposed loss", kept)
+			}
+			step := testfixture.Files(t, filepath.Join(folder.Dir, run.KeptLossDir))
+			if usage := step[run.UsageFile]; !strings.Contains(usage, `"brief":"`+files[0]+`"`) {
+				t.Errorf("usage log does not name %s:\n%s", files[0], usage)
+			}
+			if got := step[run.RawDir+"/3.txt"]; got != c.reply {
+				t.Errorf("raw reply is not the reply:\n got %q\nwant %q", got, c.reply)
+			}
+			if got := step[run.ReportsDir+"/3.md"]; got != "r\n" {
+				t.Errorf("report %q, want the reply's", got)
+			}
+
+			after := testfixture.Files(t, filepath.Join(folder.Dir, filepath.FromSlash(run.KeptLossNotes)))
+			if got := segmentNotes(after, 3); !reflect.DeepEqual(got, c.notes) {
+				t.Errorf("segment 3's notes:\n got %q\nwant %q", got, c.notes)
+			}
+			for _, n := range []int{0, 1, 2} {
+				if got, want := segmentNotes(after, n), segmentNotes(testfixture.LampStage1(), n); !reflect.DeepEqual(got, want) {
+					t.Errorf("segment %d's notes are not step 1.4's", n)
+				}
+			}
+			fails, items := still(t, folder)
+			if len(fails) != 0 {
+				t.Errorf("still fails %+v, want nothing: the re-check passed", fails)
+			}
+			if want := c.dropped; !reflect.DeepEqual(items, want) && (len(items) != 0 || len(want) != 0) {
+				t.Errorf("dropped:\n got %+v\nwant %+v", items, want)
+			}
+		})
 	}
 }
 
 // A new statement with a broken trace stops nothing in the step: the final
 // notes drop it, with its trace, and list it.
 func TestWriteFinal_DropsABrokenStatement(t *testing.T) {
-	broken := strings.Replace(tinyNote0Beta, "\"Beta is second.\"", "\"Beta is twelfth.\"", 1)
-	folder, _, err := runSegment0(t, "=== FILE: 0 Tiny.md ===\n"+broken+"=== REPORT ===\nAdded.\n", broken, "# 0 Tiny\n\npass 2\n")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if fails, _ := still(t, folder); len(fails) != 0 {
-		t.Errorf("still fails %+v: step 1.2's flags are the final notes' to act on", fails)
-	}
-	src, _ := source.Parse("Tiny", tinySource)
+	src, folder, _ := runSegment3(t, repair.Whole, false, "=== FILE: "+storms+" ===\n"+stormsBroken+"=== REPORT ===\nr\n")
 	if err := keptloss.WriteFinal(src, folder); err != nil {
 		t.Fatal(err)
 	}
 	final := testfixture.Files(t, filepath.Join(folder.Dir, filepath.FromSlash(run.FinalNotes)))
-	if final["0 Tiny.md"] != tinyNote0 || final["1 Two.md"] != tinyNote1 {
-		t.Errorf("final notes:\n%q\n%q\nwant the broken statement and its trace gone", final["0 Tiny.md"], final["1 Two.md"])
+	if !reflect.DeepEqual(final, testfixture.LampStage1()) {
+		t.Errorf("final notes:\n%q\nwant step 1.4's, the broken statement and its trace gone", final[storms])
 	}
 	items, err := dropped.Read(folder, run.FinalDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 1 || items[0].Segment != 0 || items[0].Note != "0 Tiny.md" || items[0].What != "Beta is second.[^2]" || !strings.Contains(items[0].Why, "BROKEN [^2] Beta is twelfth.") {
-		t.Errorf("dropped %+v, want the broken statement", items)
-	}
-}
-
-// An untraced statement in an aside is dropped, and so is the aside it
-// leaves with no statement.
-func TestWriteFinal_DropsAnEmptiedAside(t *testing.T) {
-	src, folder := afterProposer(t, 0)
-	writeFile(t, folder, []byte(tinyNote0), run.KeptLossDir, run.NotesDir, "0 Tiny.md")
-	writeFile(t, folder, []byte(tinyNote1), run.KeptLossDir, run.NotesDir, "1 Two.md")
-	writeFile(t, folder, []byte("# 1 Two - Aside - X\n\nAn untraced aside.\n"), run.KeptLossDir, run.NotesDir, "1 Two - Aside - X.md")
-	inner := &run.Folder{Dir: filepath.Join(folder.Dir, run.KeptLossDir)}
-	if err := mechcheckRunOn(src, inner); err != nil {
-		t.Fatal(err)
-	}
-	if err := keptloss.WriteFinal(src, folder); err != nil {
-		t.Fatal(err)
-	}
-	final := testfixture.Files(t, filepath.Join(folder.Dir, filepath.FromSlash(run.FinalNotes)))
-	if _, ok := final["1 Two - Aside - X.md"]; ok || len(final) != 2 {
-		t.Errorf("final notes %q, want the aside gone", keys(final))
-	}
-	items, err := dropped.Read(folder, run.FinalDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(items) != 2 || items[0].What != "An untraced aside." || items[1].What != "the note" || items[1].Segment != 1 {
-		t.Errorf("dropped %+v, want the statement then the aside", items)
-	}
-}
-
-// An untraced statement a note has twice is dropped both times, and the
-// step goes on: the failing item is dropped, not the run stopped.
-func TestWriteFinal_DropsEachCopyOfAStatement(t *testing.T) {
-	src, folder := afterProposer(t, 0)
-	writeFile(t, folder, []byte(tinyNote0), run.KeptLossDir, run.NotesDir, "0 Tiny.md")
-	dup := strings.Replace(tinyNote1, "\n\n[^1]", "\n\nAn untraced claim.\n\nAn untraced claim.\n\n[^1]", 1)
-	writeFile(t, folder, []byte(dup), run.KeptLossDir, run.NotesDir, "1 Two.md")
-	inner := &run.Folder{Dir: filepath.Join(folder.Dir, run.KeptLossDir)}
-	if err := mechcheckRunOn(src, inner); err != nil {
-		t.Fatal(err)
-	}
-	if err := keptloss.WriteFinal(src, folder); err != nil {
-		t.Fatal(err)
-	}
-	final := testfixture.Files(t, filepath.Join(folder.Dir, filepath.FromSlash(run.FinalNotes)))
-	if final["1 Two.md"] != tinyNote1 {
-		t.Errorf("final 1 Two.md:\n%q\nwant both copies of the untraced statement gone", final["1 Two.md"])
-	}
-	items, err := dropped.Read(folder, run.FinalDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(items) != 1 || items[0].Note != "1 Two.md" || items[0].What != "An untraced claim." || strings.Count(items[0].Why, "An untraced claim.") != 1 {
-		t.Errorf("dropped %+v, want the untraced statement", items)
-	}
-}
-
-func keys(m map[string]string) []string {
-	return slices.Sorted(maps.Keys(m))
-}
-
-// A segment with a kept loss whose notes gain no statement has each of its
-// losses listed as dropped.
-func TestRun_NothingAddedIsListed(t *testing.T) {
-	folder, _, err := runSegment0(t, "=== REPORT ===\n- Loss 0.1: already stated.\n", tinyNote0, "# 0 Tiny\n\npass 1\n")
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, items := still(t, folder)
-	want := []dropped.Item{{Segment: 0, What: "loss 0.1", Why: "the kept-loss call added no statement to the segment's notes; its report is 1.4-kept-loss-repair/reports/0.md", Loss: "0.1"}}
+	want := []dropped.Item{{Segment: 3, Note: storms, What: stood + "[^4]", Why: "BROKEN [^4] I have stood in that lamp room in a storm."}}
 	if !reflect.DeepEqual(items, want) {
-		t.Errorf("dropped %+v, want %+v", items, want)
+		t.Errorf("dropped:\n got %+v\nwant %+v", items, want)
 	}
 }
 
-// The call rewrites only the segment's existing notes: any other block is
-// dropped, and listed.
-func TestRun_DropsBlocks(t *testing.T) {
-	for _, c := range []struct{ reply, want string }{
-		{"=== DELETE: 0 Tiny.md ===\n=== REPORT ===\nDeleted.\n", "deletes no note"},
-		{"=== FILE: 0 Tiny - Aside - Beta.md ===\n# 0 Tiny - Aside - Beta\n=== REPORT ===\nAdded.\n", "adds no note"},
-		{"=== FILE: 1 Two.md ===\n# 1 Two\n=== REPORT ===\nOops.\n", "not one of the segment's notes"},
-	} {
-		folder, _, err := runSegment0(t, c.reply, tinyNote0, "# 0 Tiny\n\npass 1\n")
-		if err != nil {
-			t.Fatalf("reply %q: %v", c.reply, err)
-		}
-		_, items := still(t, folder)
-		if len(items) != 2 || !strings.Contains(items[0].Why, c.want) || items[1].What != "loss 0.1" {
-			t.Errorf("reply %q: dropped %+v, want the block, then loss 0.1 as not added", c.reply, items)
-		}
-		files := testfixture.Files(t, filepath.Join(folder.Dir, run.KeptLossDir))
-		if files[run.NotesDir+"/0 Tiny.md"] != tinyNote0 || files[run.NotesDir+"/1 Two.md"] != tinyNote1 {
-			t.Errorf("reply %q: a dropped block changed a note", c.reply)
-		}
+// keptLossNotes makes a run folder for the invented chapter whose kept-loss
+// repair wrote LampStage1, with notes in place of any it names, and ran
+// step 1.2 on them, as its re-check does.
+func keptLossNotes(t *testing.T, notes map[string]string) (*source.Source, *run.Folder) {
+	t.Helper()
+	src, folder := testfixture.LampExtractRun(t)
+	dir := filepath.Join(folder.Dir, filepath.FromSlash(run.KeptLossNotes))
+	testfixture.WriteFiles(t, dir, testfixture.LampStage1())
+	testfixture.WriteFiles(t, dir, notes)
+	inner := &run.Folder{Dir: filepath.Join(folder.Dir, run.KeptLossDir)}
+	if err := mechcheck.RunOn(src, inner, run.NotesDir, run.KeptLossMechanicalDir); err != nil {
+		t.Fatal(err)
 	}
+	return src, folder
 }
 
-// An edit-shaped reply is briefed by KeptLossEdits, and its insert is made
-// through the note model.
-func TestRun_EditReply(t *testing.T) {
-	reply := "=== EDIT: 0 Tiny.md ===\n--- AFTER ---\nAlpha is first.[^1]\n--- INSERT ---\nBeta is second.[^1]\n" +
-		"[^1]: [[Tiny#1. Tiny]] \"Beta is second.\"\n=== REPORT ===\n- Loss 0.1: added.\n"
-	folder, calls, err := runSegment0As(t, repair.Edits, reply, tinyNote0Beta, "# 0 Tiny\n\npass 2\n")
+// An untraced statement in an aside is dropped, and so is an aside it
+// leaves with no statement. An aside with a statement left is kept.
+func TestWriteFinal_DropsAnEmptiedAside(t *testing.T) {
+	src, folder := keptLossNotes(t, map[string]string{
+		"2 The Lens - Aside - Fresnel.md": "# 2 The Lens - Aside - Fresnel\n\nThe Fresnel lens was a French idea.\n",
+		aside:                             strings.Replace(testfixture.LampStage1()[aside], "every page.[^2]\n", "every page.[^2]\nThe log was kept in ink.\n", 1),
+	})
+	if err := keptloss.WriteFinal(src, folder); err != nil {
+		t.Fatal(err)
+	}
+	final := testfixture.Files(t, filepath.Join(folder.Dir, filepath.FromSlash(run.FinalNotes)))
+	if !reflect.DeepEqual(final, testfixture.LampStage1()) {
+		t.Errorf("final notes %q, want LampStage1: the emptied aside gone, the other's untraced statement dropped", final)
+	}
+	items, err := dropped.Read(folder, run.FinalDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(calls[0].System, briefs.KeptLossEdits+"\n\n"+briefs.Stage1) {
-		t.Errorf("the call is not briefed by KeptLossEdits")
+	want := []dropped.Item{
+		{Segment: 1, Note: aside, What: "The log was kept in ink.", Why: "UNTRACED statement: The log was kept in ink."},
+		{Segment: 2, Note: "2 The Lens - Aside - Fresnel.md", What: "The Fresnel lens was a French idea.", Why: "UNTRACED statement: The Fresnel lens was a French idea."},
+		{Segment: 2, Note: "2 The Lens - Aside - Fresnel.md", What: "the note", Why: "an aside left with no statement"},
 	}
-	if got := testfixture.Files(t, filepath.Join(folder.Dir, run.KeptLossDir))[run.NotesDir+"/0 Tiny.md"]; got != tinyNote0Beta {
-		t.Errorf("note 0:\n got %q\nwant %q", got, tinyNote0Beta)
+	if !reflect.DeepEqual(items, want) {
+		t.Errorf("dropped:\n got %+v\nwant %+v", items, want)
 	}
 }
 
-// The call adds statements and changes none, so an edit that replaces one is
-// dropped, and listed.
-func TestRun_DropsAReplacingEdit(t *testing.T) {
-	reply := "=== EDIT: 0 Tiny.md ===\n--- REPLACE ---\nAlpha is first.\n--- WITH ---\n=== REPORT ===\nr\n"
-	folder, _, err := runSegment0As(t, repair.Edits, reply, tinyNote0, "# 0 Tiny\n\npass 1\n")
+// An untraced statement a note has twice is dropped both times, and listed
+// once.
+func TestWriteFinal_DropsEachCopyOfAStatement(t *testing.T) {
+	dup := strings.Replace(stormsNote, "\n\n[^1]", "\n\nThe sea was cruel.\n\nThe sea was cruel.\n\n[^1]", 1)
+	src, folder := keptLossNotes(t, map[string]string{storms: dup})
+	if err := keptloss.WriteFinal(src, folder); err != nil {
+		t.Fatal(err)
+	}
+	final := testfixture.Files(t, filepath.Join(folder.Dir, filepath.FromSlash(run.FinalNotes)))
+	if final[storms] != stormsNote {
+		t.Errorf("final %s:\n%q\nwant both copies of the untraced statement gone", storms, final[storms])
+	}
+	items, err := dropped.Read(folder, run.FinalDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, items := still(t, folder)
-	if len(items) != 2 || !strings.Contains(items[0].Why, "replaces a statement, which this call may not do") {
-		t.Errorf("dropped %+v, want the replacing edit", items)
+	want := []dropped.Item{{Segment: 3, Note: storms, What: "The sea was cruel.", Why: "UNTRACED statement: The sea was cruel."}}
+	if !reflect.DeepEqual(items, want) {
+		t.Errorf("dropped:\n got %+v\nwant %+v", items, want)
 	}
-}
-
-// The kept-loss brief for edits written quote-once is the quote-once
-// kept-loss brief, then the quote-once stage 1 rules. Whole notes have none.
-func TestBrief_QuoteOnce(t *testing.T) {
-	if file, got := keptloss.Brief(repair.Edits, true); file != briefs.KeptLossEditsQuoteOnceFile || got != briefs.KeptLossEditsQuoteOnce+"\n\n"+briefs.Stage1QuoteOnce {
-		t.Errorf("Brief(Edits, true) is not the quote-once kept-loss brief and the quote-once stage 1 rules")
-	}
-	if file, got := keptloss.Brief(repair.Whole, true); file != briefs.KeptLossFile || got != briefs.KeptLoss+"\n\n"+briefs.Stage1 {
-		t.Errorf("Brief(Whole, true) is not the kept-loss brief")
-	}
-}
-
-// mechcheckRunOn runs step 1.2 on the kept-loss repair's notes in its
-// directory, inner, as its re-check does.
-func mechcheckRunOn(src *source.Source, inner *run.Folder) error {
-	return mechcheck.RunOn(src, inner, run.NotesDir, run.KeptLossMechanicalDir)
 }

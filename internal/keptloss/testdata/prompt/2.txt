@@ -1,0 +1,25 @@
+=== YOUR SEGMENT'S NOTES (segment 2: The Lens) ===
+--- NOTE: 2 The Lens ---
+# 2 The Lens
+
+The lens bends light into a beam.[^1]
+A beam carries farther than a glow.[^2]
+Obviously, a keeper can take no notice of the lens on a clear night.[^3]
+On a foggy night it is no help at all.[^4]
+It uses rings of prisms instead of one thick glass.[^5]
+
+[^1]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Lens]] "The lens bends light into a beam."
+[^2]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Lens]] "A beam carries farther than a glow."
+[^3]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Lens]] "Obviously, a keeper can take no notice of the lens on a clear night."
+[^4]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Lens]] "On a foggy night it is no help at all."
+[^5]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Lens]] "uses rings of prisms instead of one thick glass"
+
+=== END YOUR SEGMENT'S NOTES (segment 2: The Lens) ===
+
+=== KEPT LOSSES ===
+Loss 2.1
+
+Run 1: The lens is named: the Fresnel lens.
+- Quote: "*The Fresnel lens*"
+- Why: the section names it
+=== END KEPT LOSSES ===

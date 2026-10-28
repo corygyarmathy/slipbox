@@ -1,0 +1,39 @@
+=== YOUR SEGMENT'S NOTES (segment 1: The Keeper’s Watch) ===
+--- NOTE: 1 The Keeper's Watch - Aside - The log ---
+# 1 The Keeper's Watch - Aside - The log
+
+The log was read by nobody until a ship was lost.[^1]
+Then they read every page.[^2]
+
+[^1]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Keeper’s Watch]] "The log was read by nobody until a ship was lost."
+[^2]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Keeper’s Watch]] "read every page"
+
+--- NOTE: 1 The Keeper's Watch ---
+# 1 The Keeper's Watch
+
+The watch began at dusk.[^1]
+He trimmed the wick every four hours.[^2]
+He logged the weather in a book.[^3]
+
+[^1]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Keeper’s Watch]] "The watch began at dusk."
+[^2]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Keeper’s Watch]] "trimmed the wick every four hours"
+[^3]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Keeper’s Watch]] "logged the weather in a book"
+
+=== END YOUR SEGMENT'S NOTES (segment 1: The Keeper’s Watch) ===
+
+=== KEPT LOSSES ===
+Loss 1.1
+
+Run 1: The keeper kept a weather log.
+- Quote: "logged the weather in a book"
+- Why: it says what the log held
+
+Run 2: The weather went into a book.
+- Quote: "logged the weather in a book"
+
+Loss 1.2
+
+Run 2: Inspectors read the log only after a wreck.
+- Quote: "Then the inspectors read every page."
+- Why: it says who read the log
+=== END KEPT LOSSES ===
