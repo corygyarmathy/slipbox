@@ -115,11 +115,9 @@ func lampModel(t *testing.T, runDir string, over lampReplies) *testfixture.Fake 
 		case run.ExtractDir:
 			// A note given traced is written as given, quote-once or not.
 			var b strings.Builder
-			stage1 := testfixture.LampStage1()
-			for _, name := range keys(stage1) {
-				if strings.HasPrefix(name, prefix) {
-					b.WriteString("=== FILE: " + name + " ===\n" + stage1[name])
-				}
+			notes := testfixture.SegmentNotes(testfixture.LampStage1(), n)
+			for _, name := range keys(notes) {
+				b.WriteString("=== FILE: " + name + " ===\n" + notes[name])
 			}
 			return provider.Reply{Text: b.String() + "=== REPORT ===\nNone.\n"}, nil
 		case run.SupportCheckDir, run.ReadsAloneDir:
