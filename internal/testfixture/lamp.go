@@ -13,9 +13,9 @@ import (
 )
 
 // Lamp is the invented chapter's name, the source file name without .md.
-// The chapter, its final stage 1 notes and their split are invented, so the
-// tests of step 2.1's gates, strip traces and the format check that read
-// them read no trial text.
+// The chapter, its stage 1 notes and their split are invented, so the tests
+// that read them, of the step 1.3 checks, step 2.1's gates, strip traces and
+// the format check among them, read no trial text.
 const Lamp = "Lighthouses - Ch 2 - Keepers of the Lamp"
 
 // LampChapter is the invented chapter: four segments, the first the text
@@ -240,9 +240,27 @@ func LampFolders(t testing.TB, files map[string]string) []split.SegmentFolder {
 	return folders
 }
 
+// LampExtractRun makes a run folder for LampChapter whose step 1.1 wrote
+// LampStage1 as its stage 1 notes, the folder the step 1.3 checks read.
+func LampExtractRun(t testing.TB) (*source.Source, *run.Folder) {
+	t.Helper()
+	src, folder := lampFolder(t)
+	WriteFiles(t, filepath.Join(folder.Dir, filepath.FromSlash(run.ExtractNotes)), LampStage1())
+	return src, folder
+}
+
 // LampRun makes a run folder for LampChapter whose final stage 1 notes are
 // LampStage1 and whose step 2.1 split is LampSplit.
 func LampRun(t testing.TB) (*source.Source, *run.Folder) {
+	t.Helper()
+	src, folder := lampFolder(t)
+	WriteFiles(t, filepath.Join(folder.Dir, filepath.FromSlash(run.FinalNotes)), LampStage1())
+	WriteFiles(t, filepath.Join(folder.Dir, filepath.FromSlash(run.SplitNotes)), LampSplit())
+	return src, folder
+}
+
+// lampFolder makes a new run folder holding LampChapter as its source.
+func lampFolder(t testing.TB) (*source.Source, *run.Folder) {
 	t.Helper()
 	src := LampSource(t)
 	folder, err := run.New(filepath.Join(t.TempDir(), "run"))
@@ -252,7 +270,5 @@ func LampRun(t testing.TB) (*source.Source, *run.Folder) {
 	if err := folder.SaveSource(src.Name, []byte(src.Frame)); err != nil {
 		t.Fatalf("testfixture: %v", err)
 	}
-	WriteFiles(t, filepath.Join(folder.Dir, filepath.FromSlash(run.FinalNotes)), LampStage1())
-	WriteFiles(t, filepath.Join(folder.Dir, filepath.FromSlash(run.SplitNotes)), LampSplit())
 	return src, folder
 }
