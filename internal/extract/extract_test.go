@@ -78,13 +78,17 @@ func badName(t *testing.T, name string) string {
 // reply, and its name says which.
 func replyCases(t *testing.T) []replyCase {
 	return []replyCase{
-		// A well-formed reply: one note named with the segment's number, its
+		// A well-formed reply: notes named with the segment's number, their
 		// statements written quote-once, which s2n traces into the
-		// segment's own section, joining text and a `{}` cut included. The
-		// report is kept as given.
+		// segment's own section, joining text and a `{}` cut included. An
+		// aside named with its number keeps the H1 it was given, which
+		// isn't its name, and gets no rename line. The report is kept as
+		// given.
 		{"well-formed, quote-once", 0, "=== FILE: 0 Keepers of the Lamp.md ===\n# 0 Keepers of the Lamp\n\n" +
 			"A lighthouse is a promise made to ships{, and} it burns whether or not a ship is near.\n" +
 			"The keeper kept that promise{} for the harbour.\n" +
+			"=== FILE: 0 Keepers of the Lamp - Aside - Promises.md ===\n# Promises\n\n" +
+			"The keeper kept that promise for the harbour.\n" +
 			"=== REPORT ===\nNo repairs.\n",
 			segmentWant{
 				notes: map[string]string{
@@ -95,6 +99,9 @@ func replyCases(t *testing.T) []replyCase {
 						lampTrace(2, "2. Keepers of the Lamp", "It burns whether or not a ship is near.") +
 						lampTrace(3, "2. Keepers of the Lamp", "The keeper kept that promise") +
 						lampTrace(4, "2. Keepers of the Lamp", "for the harbour."),
+					"0 Keepers of the Lamp - Aside - Promises.md": "# Promises\n\n" +
+						"The keeper kept that promise for the harbour.[^1]\n\n" +
+						lampTrace(1, "2. Keepers of the Lamp", "The keeper kept that promise for the harbour."),
 				},
 				report: "No repairs.\n",
 			}},
