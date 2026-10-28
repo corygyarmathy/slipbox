@@ -117,24 +117,24 @@ func wantSystem(t *testing.T, brief, rules string) string {
 		"\n\n=== FRAME: " + testfixture.Lamp + ".md ===\n" + testfixture.LampChapter + "\n=== END FRAME ===\n"
 }
 
-// TestBrief checks each reply shape's brief against the brief files. Whole
-// notes have no quote-once brief, so they are briefed as trialled with
-// quote-once or without.
+// briefFiles names each reply shape's brief, then its rules, files in
+// internal/briefs/, with quote-once and without. Whole notes have no
+// quote-once brief, so they are briefed as trialled with quote-once or
+// without.
+var briefFiles = map[bool]map[repair.Reply][2]string{
+	false: {repair.Whole: {"repair.md", "stage-1.md"}, repair.Edits: {"repair-edits.md", "stage-1.md"}},
+	true:  {repair.Whole: {"repair.md", "stage-1.md"}, repair.Edits: {"repair-edits-quote-once.md", "stage-1-quote-once.md"}},
+}
+
+// TestBrief checks each reply shape's brief against the brief files.
 func TestBrief(t *testing.T) {
-	for _, c := range []struct {
-		shape        repair.Reply
-		quoteOnce    bool
-		brief, rules string
-	}{
-		{repair.Whole, false, "repair.md", "stage-1.md"},
-		{repair.Whole, true, "repair.md", "stage-1.md"},
-		{repair.Edits, false, "repair-edits.md", "stage-1.md"},
-		{repair.Edits, true, "repair-edits-quote-once.md", "stage-1-quote-once.md"},
-	} {
-		file, got := repair.Brief(c.shape, c.quoteOnce)
-		want := testfixture.RepoFile(t, "internal/briefs/"+c.brief) + "\n\n" + testfixture.RepoFile(t, "internal/briefs/"+c.rules)
-		if file != c.brief || got != want {
-			t.Errorf("Brief(%s, %v) is %s and its text, want %s, a blank line, then %s", c.shape, c.quoteOnce, file, c.brief, c.rules)
+	for quoteOnce, shapes := range briefFiles {
+		for shape, files := range shapes {
+			file, got := repair.Brief(shape, quoteOnce)
+			want := testfixture.RepoFile(t, "internal/briefs/"+files[0]) + "\n\n" + testfixture.RepoFile(t, "internal/briefs/"+files[1])
+			if file != files[0] || got != want {
+				t.Errorf("Brief(%s, %v) is %s and its text, want %s, a blank line, then %s", shape, quoteOnce, file, files[0], files[1])
+			}
 		}
 	}
 }
@@ -214,6 +214,13 @@ func TestPrompt(t *testing.T) {
 	if got := repair.Prompt(notes, source.Segment{Number: 7, Heading: "None"}, mech, "", ""); !strings.Contains(got, "=== MECHANICAL CHECK ===\nNo lines.\n") {
 		t.Errorf("Prompt for a segment with no report sections:\n%s", got)
 	}
+	// A report is carried as received, a correction that flags a statement
+	// again included.
+	corrected := runSupport[2] + "\nCorrection to the above:\n\n" +
+		"- [weak] \"Obviously, a keeper…\": the section says can, not does.\n"
+	if got := repair.Prompt(notes, src.Segments[2], mech, corrected, runReadsAlone[2]); !strings.Contains(got, "=== SUPPORT AND CUTS CHECK ===\n"+corrected) {
+		t.Errorf("Prompt does not carry a corrected report as received:\n%s", got)
+	}
 }
 
 // runCase is a called segment's repair reply in TestRun, and the notes, by
@@ -280,7 +287,7 @@ var runCases = []runCase{
 
 // recheckSupport and recheckReadsAlone are the re-check's replies for the
 // segments the repair call changed, 1 and 3. Segment 1's repair left nothing
-// failing. Segment 3's flag a quote that starts mid-statement, at the
+// failing. Segment 3's flags are a quote that starts mid-statement, at the
 // author's name, and the statement that shares a line with the one whose
 // trace is broken.
 var (
@@ -379,9 +386,13 @@ func TestRun(t *testing.T) {
 	}
 
 	// The re-check calls each check on the changed segments only, on the
-	// repaired notes.
+	// repaired notes, at the checks' tier. Their system prompts are the
+	// checks' own, which supportcheck's and readsalone's tests pin.
 	notes := readNotes(t, folder, run.RepairNotes)
 	recheck := testfixture.NewFake(func(req provider.Request) (provider.Reply, error) {
+		if req.Model != "sonnet" || req.Effort != "medium" {
+			t.Errorf("re-check call for %.80q: model %q at effort %q, want sonnet at medium", req.User, req.Model, req.Effort)
+		}
 		for _, n := range changed {
 			switch req.User {
 			case supportcheck.Prompt(notes, src.Segments[n]):
@@ -556,6 +567,15 @@ var replyCases = []replyCase{
 				"[^4]: " + watchTrace("logged the weather in a book.") + "\n",
 			aside: fixedAsideNote,
 		}},
+	// With quote-once, a note given in full without footnotes is traced by
+	// s2n.
+	{name: "quote-once: a note in full traced", shape: repair.Edits, quoteOnce: true,
+		reply: "=== FILE: " + aside + " ===\n" +
+			"# 1 The Keeper's Watch - Aside - The log\n\n" +
+			"The log was read by nobody until a ship was lost.\n" +
+			"Then the inspectors read every page.\n" +
+			"=== REPORT ===\nr\n",
+		notes: map[string]string{watch: testfixture.LampStage1()[watch], aside: fixedAsideNote}},
 	{name: "an aside deleted", shape: repair.Edits,
 		reply: "=== DELETE: " + aside + " ===\n=== REPORT ===\nr\n",
 		notes: map[string]string{watch: testfixture.LampStage1()[watch]}},
@@ -630,10 +650,6 @@ var replyCases = []replyCase{
 // TestRun_Replies runs step 1.4 with each reply case as segment 1's reply,
 // the only one called, and checks the call and what the step wrote.
 func TestRun_Replies(t *testing.T) {
-	briefFiles := map[bool]map[repair.Reply][2]string{
-		false: {repair.Whole: {"repair.md", "stage-1.md"}, repair.Edits: {"repair-edits.md", "stage-1.md"}},
-		true:  {repair.Whole: {"repair.md", "stage-1.md"}, repair.Edits: {"repair-edits-quote-once.md", "stage-1-quote-once.md"}},
-	}
 	for _, c := range replyCases {
 		t.Run(c.name, func(t *testing.T) {
 			src, folder := segment1Run(t)
@@ -731,6 +747,25 @@ func TestWriteStillFails_NeedsTheRecheckFindings(t *testing.T) {
 	}
 	if err := repair.WriteStillFails(src, folder); err == nil || !strings.Contains(err.Error(), findings) {
 		t.Fatalf("err = %v, want one naming %s", err, findings)
+	}
+}
+
+// A repair that changes no segment's notes makes no re-check call: an empty
+// list of changed segments is not every segment.
+func TestRecheck_NoCallWhenNothingChanged(t *testing.T) {
+	src, folder := segment1Run(t)
+	p := testfixture.Serve(t, testfixture.Case{Contains: segment(1), Reply: "=== REPORT ===\nKept every flag.\n"})
+	if err := repair.Run(context.Background(), p, src, "opus", repair.Edits, true, folder); err != nil {
+		t.Fatal(err)
+	}
+	recheck := testfixture.NewFake(func(req provider.Request) (provider.Reply, error) {
+		return provider.Reply{Text: "pass\n"}, nil
+	})
+	if err := repair.Recheck(context.Background(), recheck, src, folder); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(recheck.Calls()); n != 0 {
+		t.Errorf("%d re-check calls, want none: no segment changed", n)
 	}
 }
 
