@@ -87,7 +87,7 @@ func TestParse_OnlyTheCheckGrades(t *testing.T) {
 // span before the first colon outside quotes, or in the line if it has no
 // such colon, is a statement; a line with none is one flag with no statement.
 // A span ends only at its own closing quote, so a statement keeps the single
-// quotes and apostrophes it holds. A line whose reason says the statement
+// quotes and apostrophes it holds, and a curly span the straight quotes. A line whose reason says the statement
 // passes is still a flag: the parser reads shape, not intent.
 func TestParse_GradedShapes(t *testing.T) {
 	report := "# 1 A\n" +
@@ -99,6 +99,9 @@ func TestParse_GradedShapes(t *testing.T) {
 		"- [weak] \"Wick…\", \"Oil…\", \"Glass…\", \"Log…\": a list of four\n" +
 		"- [cut lost content] \"The keeper's 'great' lamp…\": the cut \"of the harbour\" named it\n" +
 		"- [dangling] \"He lit it.\": \"He\" is the keeper. Pass, not dangling.\n" +
+		"- [weak] “The keeper said \"trim\" twice…”: reason\n" +
+		"- [cut would do] \"The lamp burned all night.\": \"all night\" would do\n" +
+		"- [outside-frame] \"As the last chapter said…\": not in this source\n" +
 		"- [reworded] The same statement: the source reads \"given\"\n" +
 		"- [dangling] \"Its quote: has a colon\": \"this\": no antecedent\n" +
 		"- [weak] \"No colon\" anywhere\n"
@@ -117,6 +120,9 @@ func TestParse_GradedShapes(t *testing.T) {
 			{H1: "1 A", Grades: []checker.Grade{checker.Weak}, Statement: "Log…", Reason: "a list of four"},
 			{H1: "1 A", Grades: []checker.Grade{checker.CutLostContent}, Statement: "The keeper's 'great' lamp…", Reason: `the cut "of the harbour" named it`},
 			{H1: "1 A", Grades: []checker.Grade{checker.Dangling}, Statement: "He lit it.", Reason: `"He" is the keeper. Pass, not dangling.`},
+			{H1: "1 A", Grades: []checker.Grade{checker.Weak}, Statement: `The keeper said "trim" twice…`, Reason: "reason"},
+			{H1: "1 A", Grades: []checker.Grade{checker.CutWouldDo}, Statement: "The lamp burned all night.", Reason: `"all night" would do`},
+			{H1: "1 A", Grades: []checker.Grade{checker.OutsideFrame}, Statement: "As the last chapter said…", Reason: "not in this source"},
 			{H1: "1 A", Grades: []checker.Grade{checker.Reworded}, Statement: "", Reason: `The same statement: the source reads "given"`},
 			{H1: "1 A", Grades: []checker.Grade{checker.Dangling}, Statement: "Its quote: has a colon", Reason: `"this": no antecedent`},
 			{H1: "1 A", Grades: []checker.Grade{checker.Weak}, Statement: "No colon", Reason: `"No colon" anywhere`},
