@@ -2,7 +2,6 @@ package split_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/corygyarmathy/slipbox/internal/fallback"
 	"github.com/corygyarmathy/slipbox/internal/note"
-	"github.com/corygyarmathy/slipbox/internal/provider"
 	"github.com/corygyarmathy/slipbox/internal/run"
 	"github.com/corygyarmathy/slipbox/internal/source"
 	"github.com/corygyarmathy/slipbox/internal/split"
@@ -49,14 +47,6 @@ func atFinal(t *testing.T, src *source.Source, notes map[string]string) *run.Fol
 // segment is the key a fake matches a segment's call on: the label its user
 // prompt gives the segment's notes.
 func segment(n int) string { return fmt.Sprintf("=== SEGMENT %d STAGE 1 NOTES ===", n) }
-
-// noCalls is a provider that fails t if it is called.
-func noCalls(t *testing.T) *testfixture.Fake {
-	return testfixture.NewFake(func(req provider.Request) (provider.Reply, error) {
-		t.Errorf("unexpected call: %.80q", req.User)
-		return provider.Reply{}, errors.New("unexpected call")
-	})
-}
 
 // TestPrompt pins each segment's user prompt on the invented chapter: its
 // own final stage 1 notes, the aside among them, then the hub title and the
@@ -234,8 +224,8 @@ func TestRun(t *testing.T) {
 			}
 		})
 	}
-	// Only the segments whose replies don't fall back have folders, and the
-	// fallbacks are listed in segment order.
+	// Only the segments whose replies don't fall back have folders, and only
+	// segment 2's is listed as a fallback.
 	got := map[string]bool{}
 	for path := range under(files, run.Stage2NotesDir) {
 		dir, _, _ := strings.Cut(path, "/")
@@ -384,7 +374,7 @@ func TestRun_ABadReplyFallsBack(t *testing.T) {
 			if err := os.Rename(step, step+run.PartialSuffix); err != nil {
 				t.Fatal(err)
 			}
-			if err := split.Run(context.Background(), noCalls(t), src, split.DefaultModel, folder); err != nil {
+			if err := split.Run(context.Background(), testfixture.Serve(t), src, split.DefaultModel, folder); err != nil {
 				t.Fatalf("reply %q: resume: %v", c.reply, err)
 			}
 		}
@@ -433,7 +423,7 @@ func TestRun_RefusesATitleThatCantNameAFolder(t *testing.T) {
 	}
 	notes := map[string]string{"0 Tiny.md": tinyNote0}
 	folder := atFinal(t, src, notes)
-	p := noCalls(t)
+	p := testfixture.Serve(t)
 	if err := split.Run(context.Background(), p, src, split.DefaultModel, folder); err == nil {
 		t.Errorf("no error")
 	}
