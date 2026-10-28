@@ -16,7 +16,6 @@ import (
 	"github.com/corygyarmathy/slipbox/internal/run"
 	"github.com/corygyarmathy/slipbox/internal/source"
 	"github.com/corygyarmathy/slipbox/internal/split"
-	"github.com/corygyarmathy/slipbox/internal/striptraces"
 	"github.com/corygyarmathy/slipbox/internal/testfixture"
 )
 
@@ -37,24 +36,6 @@ func folders(t *testing.T, files map[string]string) []split.SegmentFolder {
 	dir := t.TempDir()
 	testfixture.WriteFiles(t, dir, files)
 	return readFolders(t, dir)
-}
-
-// stripped is the invented split with its traces stripped, by
-// slash-separated path under `stage-2/`, as step 2.2 writes it: the notes
-// the format check takes as stage 2's.
-func stripped(t *testing.T) map[string]string {
-	t.Helper()
-	out := map[string]string{}
-	for _, f := range folders(t, testfixture.LampSplit()) {
-		for _, n := range f.Notes {
-			s, err := striptraces.Strip(n, testfixture.LampCitekeyLink, f.IsHub(n))
-			if err != nil {
-				t.Fatal(err)
-			}
-			out[f.Name+"/"+n.Name] = s.Render()
-		}
-	}
-	return out
 }
 
 // edited is files with old, which must be in the file rel, replaced by new.
@@ -181,7 +162,7 @@ NEW NOTE (not in stage 2): 3 Storms/New Note.md
 // note whose full stop moved past a footnote reference, the check gives
 // each note's markup and problems.
 func TestCheck(t *testing.T) {
-	split := stripped(t)
+	split := testfixture.LampStripped(t)
 	markup := edited(t, split, "2 The Lens/Rings of Prisms.md", "uses rings of prisms", "uses _rings_ of **prisms**")
 	markup = edited(t, markup, "2 The Lens/A Keeper Need Not Watch the Lens.md", "Obviously,", "- Obviously,")
 	markup = edited(t, markup, "0 Keepers of the Lamp/A Lighthouse Is a Promise.md", "A lighthouse is", "> [!Abstract] Keepers of the Lamp\n> A lighthouse is")
@@ -306,7 +287,7 @@ func lamp(t *testing.T) (*source.Source, *run.Folder) {
 	if err := folder.SaveSource(src.Name, []byte(src.Frame)); err != nil {
 		t.Fatal(err)
 	}
-	notes := stripped(t)
+	notes := testfixture.LampStripped(t)
 	for _, dir := range []string{run.StrippedNotes, run.FormattedNotes} {
 		testfixture.WriteFiles(t, filepath.Join(folder.Dir, filepath.FromSlash(dir)), notes)
 	}

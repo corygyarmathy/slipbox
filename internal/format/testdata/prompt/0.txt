@@ -1,0 +1,24 @@
+=== SEGMENT 0 STAGE 2 NOTES ===
+--- NOTE: A Lighthouse Is a Promise.md ---
+# A Lighthouse Is a Promise[^1]
+
+A lighthouse is a promise made to ships.
+It burns whether or not a ship is near.
+
+[^1]: [[@A History of Lighthouses - Rhea Vale]]
+
+--- NOTE: Keepers of the Lamp.md ---
+# Keepers of the Lamp
+
+1. [[A Lighthouse Is a Promise]]
+2. [[The Keeper Kept the Promise]]
+
+--- NOTE: The Keeper Kept the Promise.md ---
+# The Keeper Kept the Promise[^1]
+
+The keeper kept that promise for the harbour.
+
+[^1]: [[@A History of Lighthouses - Rhea Vale]]
+
+=== END SEGMENT 0 STAGE 2 NOTES ===
+

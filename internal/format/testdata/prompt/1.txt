@@ -1,0 +1,26 @@
+=== SEGMENT 1 STAGE 2 NOTES ===
+--- NOTE: The Keeper's Watch.md ---
+# The Keeper's Watch
+
+1. [[The Watch Began at Dusk]]
+    - Aside: [[The Log Was Read Only After a Wreck]]
+
+--- NOTE: The Log Was Read Only After a Wreck.md ---
+# The Log Was Read Only After a Wreck[^1]
+
+The log was read by nobody until a ship was lost.
+Then the inspectors read every page.
+
+[^1]: [[@A History of Lighthouses - Rhea Vale]]
+
+--- NOTE: The Watch Began at Dusk.md ---
+# The Watch Began at Dusk[^1]
+
+The watch began at dusk.
+The keeper trimmed the wick every four hours.
+The keeper logged the weather in a book.
+
+[^1]: [[@A History of Lighthouses - Rhea Vale]]
+
+=== END SEGMENT 1 STAGE 2 NOTES ===
+

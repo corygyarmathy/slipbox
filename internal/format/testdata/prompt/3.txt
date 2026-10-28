@@ -1,0 +1,24 @@
+=== SEGMENT 3 STAGE 2 NOTES ===
+--- NOTE: In a Storm the Light Matters Most.md ---
+# In a Storm the Light Matters Most[^1]
+
+In a storm the light matters most.
+A wreck was the keeper’s failure, whatever the weather.
+
+[^1]: [[@A History of Lighthouses - Rhea Vale]]
+
+--- NOTE: Storms.md ---
+# Storms
+
+1. [[In a Storm the Light Matters Most]]
+2. [[The Keeper Stayed Through Every Gale]]
+
+--- NOTE: The Keeper Stayed Through Every Gale.md ---
+# The Keeper Stayed Through Every Gale[^1]
+
+The keeper stayed at the lamp (in 1839, for nine days) through every gale.
+
+[^1]: [[@A History of Lighthouses - Rhea Vale]]
+
+=== END SEGMENT 3 STAGE 2 NOTES ===
+
