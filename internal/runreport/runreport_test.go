@@ -67,6 +67,28 @@ func TestReport(t *testing.T) {
 	}
 }
 
+// The report counts each final note's name spans that point outside their
+// segment, step 1.2's cross-segment findings, and links each note that has
+// any with its count. Another kind of finding isn't counted, and a note with
+// none isn't listed.
+func TestReport_NameSpansOutsideTheirSegment(t *testing.T) {
+	in := runreport.Input{
+		SourceName: "Tiny",
+		RunDir:     "/runs/Tiny/x",
+		Mech: &mechcheck.Report{Notes: []mechcheck.NoteReport{
+			{Name: "0 A.md", Findings: []mechcheck.Finding{{Kind: mechcheck.CrossSegment}, {Kind: mechcheck.Fuzzy}, {Kind: mechcheck.CrossSegment}}},
+			{Name: "1 B.md", Findings: []mechcheck.Finding{{Kind: mechcheck.Fuzzy}}},
+			{Name: "2 C.md", Findings: []mechcheck.Finding{{Kind: mechcheck.CrossSegment}}},
+		}},
+	}
+	got := runreport.Report(in)
+	want := "- Name spans that point outside their segment, author name spans included: 3, in " +
+		"[0 A](<../stage-1-final/stage-1/0 A.md>) (2), [2 C](<../stage-1-final/stage-1/2 C.md>) (1)\n"
+	if !strings.Contains(got, want) {
+		t.Errorf("report has no %q:\n%s", want, got)
+	}
+}
+
 // The staged report names the notes, since the run folder its links point
 // into is deleted once a run succeeds.
 func TestReport_Staged(t *testing.T) {
