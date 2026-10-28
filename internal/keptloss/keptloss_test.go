@@ -25,7 +25,6 @@ import (
 
 // The invented chapter's notes, by file name.
 const (
-	watch  = "1 The Keeper's Watch.md"
 	aside  = "1 The Keeper's Watch - Aside - The log.md"
 	lens   = "2 The Lens.md"
 	storms = "3 Storms.md"
@@ -71,13 +70,16 @@ func segmentNotes(files map[string]string, n int) map[string]string {
 	return out
 }
 
+// frame is the invented chapter's frame, as a system prompt gives it after
+// its brief.
+const frame = "\n\n=== FRAME: " + testfixture.Lamp + ".md ===\n" + testfixture.LampChapter + "\n=== END FRAME ===\n"
+
 // wantSystem is the system prompt of a kept-loss call on the invented
 // chapter briefed by brief, then rules, files in internal/briefs/. It is
 // built here rather than with keptloss.Brief, so a fault there still shows.
 func wantSystem(t *testing.T, brief, rules string) string {
 	t.Helper()
-	return testfixture.RepoFile(t, "internal/briefs/"+brief) + "\n\n" + testfixture.RepoFile(t, "internal/briefs/"+rules) +
-		"\n\n=== FRAME: " + testfixture.Lamp + ".md ===\n" + testfixture.LampChapter + "\n=== END FRAME ===\n"
+	return testfixture.RepoFile(t, "internal/briefs/"+brief) + "\n\n" + testfixture.RepoFile(t, "internal/briefs/"+rules) + frame
 }
 
 // briefFiles names each reply shape's brief, then its rules, files in
@@ -104,7 +106,7 @@ func TestBrief(t *testing.T) {
 
 // runLosses are step 1.5's union for TestPrompt and TestRun. Segment 0 has
 // none. Segment 1 has two, the first worded by two runs, one of them with no
-// why. Segments 2 and 3 have one each.
+// why, the second with two quotes. Segments 2 and 3 have one each.
 var runLosses = []lossproposer.Segment{
 	{Segment: 0, Heading: "2. Keepers of the Lamp", Losses: []lossproposer.Loss{}, Other: []lossproposer.Line{}},
 	{Segment: 1, Heading: "The Keeper’s Watch", Losses: []lossproposer.Loss{
@@ -113,7 +115,7 @@ var runLosses = []lossproposer.Segment{
 			{Run: 2, Idea: "The weather went into a book.", Quotes: []string{"logged the weather in a book"}},
 		}},
 		{Wordings: []lossproposer.Item{
-			{Run: 2, Idea: "Inspectors read the log only after a wreck.", Quotes: []string{"Then the inspectors read every page."}, Why: "it says who read the log"},
+			{Run: 2, Idea: "Inspectors read the log only after a wreck.", Quotes: []string{"read by nobody until a ship was lost", "Then the inspectors read every page."}, Why: "it says who read the log"},
 		}},
 	}, Other: []lossproposer.Line{}},
 	{Segment: 2, Heading: "The Lens", Losses: []lossproposer.Loss{
@@ -314,16 +316,17 @@ func TestRun(t *testing.T) {
 	}
 
 	// The re-check runs step 1.3a once per segment with a kept loss, on the
-	// notes the call left. Its system prompt is the check's own, which
-	// supportcheck's tests pin, so only its notes are checked here: step
-	// 1.3a's user prompt names the notes, and the system prompt holds them.
+	// notes the call left: briefed by step 1.3a's brief, then the frame, then
+	// the kept-loss notes, which step 1.3a's user prompt only names. The
+	// shared block is supportcheck's, whose tests pin its layout.
 	afterNotes, err := note.ReadDir(filepath.Join(folder.Dir, filepath.FromSlash(run.KeptLossNotes)))
 	if err != nil {
 		t.Fatal(err)
 	}
+	recheckSystem := testfixture.RepoFile(t, "internal/briefs/checker-support.md") + frame + "\n" + supportcheck.Shared(afterNotes)
 	for _, c := range p.Calls() {
-		if !isKeptCall(c.User) && !strings.Contains(c.System, supportcheck.Shared(afterNotes)) {
-			t.Errorf("re-check call for %.80q: system prompt does not hold the kept-loss notes", c.User)
+		if !isKeptCall(c.User) && c.System != recheckSystem {
+			t.Errorf("re-check call for %.80q: system prompt is not step 1.3a's brief, the frame and the kept-loss notes", c.User)
 		}
 	}
 	if len(recheckUsers) != len(runCases) {
@@ -394,7 +397,7 @@ func TestRun(t *testing.T) {
 }
 
 // still checks that the step is complete, and gives what it lists as still
-// failing and dropped.
+// failing and dropped. Still fails is a list even when empty, never null.
 func still(t *testing.T, folder *run.Folder) ([]repair.Entry, []dropped.Item) {
 	t.Helper()
 	if !folder.Complete(run.KeptLossDir) {
@@ -403,6 +406,9 @@ func still(t *testing.T, folder *run.Folder) ([]repair.Entry, []dropped.Item) {
 	var fails []repair.Entry
 	if err := json.Unmarshal([]byte(testfixture.Files(t, filepath.Join(folder.Dir, run.KeptLossDir))[run.StillFailsFile]), &fails); err != nil {
 		t.Fatal(err)
+	}
+	if fails == nil {
+		t.Errorf("%s is null, want a list", run.StillFailsFile)
 	}
 	items, err := dropped.Read(folder, run.KeptLossDir)
 	if err != nil {
@@ -515,6 +521,15 @@ var replyCases = []replyCase{
 		notes: map[string]string{storms: stormsNote},
 		dropped: []dropped.Item{
 			{Segment: 3, Note: storms, What: "the reply's DELETE", Why: "the kept-loss call deletes no note"},
+			unadded(3, 1),
+		}},
+	// A block whose name is no note file name is dropped with the note
+	// model's reason.
+	{name: "a name that is no note's", shape: repair.Edits,
+		reply: "=== FILE: ../3 Storms.md ===\n" + stormsStood + "=== REPORT ===\nr\n",
+		notes: map[string]string{storms: stormsNote},
+		dropped: []dropped.Item{
+			{Segment: 3, Note: "../3 Storms.md", What: "the reply's FILE block", Why: `note name "../3 Storms.md" is not a plain file name`},
 			unadded(3, 1),
 		}},
 	{name: "a new note", shape: repair.Edits,
@@ -654,18 +669,23 @@ func keptLossNotes(t *testing.T, notes map[string]string) (*source.Source, *run.
 }
 
 // An untraced statement in an aside is dropped, and so is an aside it
-// leaves with no statement. An aside with a statement left is kept.
+// leaves with no statement. An aside with a statement left is kept, and so
+// is one that had no statement to begin with: only a drop empties an aside.
 func TestWriteFinal_DropsAnEmptiedAside(t *testing.T) {
+	const bare = "3 Storms - Aside - Calm.md"
 	src, folder := keptLossNotes(t, map[string]string{
 		"2 The Lens - Aside - Fresnel.md": "# 2 The Lens - Aside - Fresnel\n\nThe Fresnel lens was a French idea.\n",
 		aside:                             strings.Replace(testfixture.LampStage1()[aside], "every page.[^2]\n", "every page.[^2]\nThe log was kept in ink.\n", 1),
+		bare:                              "# 3 Storms - Aside - Calm\n",
 	})
 	if err := keptloss.WriteFinal(src, folder); err != nil {
 		t.Fatal(err)
 	}
 	final := testfixture.Files(t, filepath.Join(folder.Dir, filepath.FromSlash(run.FinalNotes)))
-	if !reflect.DeepEqual(final, testfixture.LampStage1()) {
-		t.Errorf("final notes %q, want LampStage1: the emptied aside gone, the other's untraced statement dropped", final)
+	wantNotes := testfixture.LampStage1()
+	wantNotes[bare] = "# 3 Storms - Aside - Calm\n"
+	if !reflect.DeepEqual(final, wantNotes) {
+		t.Errorf("final notes %q, want LampStage1 and the bare aside: the emptied aside gone, the other's untraced statement dropped", final)
 	}
 	items, err := dropped.Read(folder, run.FinalDir)
 	if err != nil {

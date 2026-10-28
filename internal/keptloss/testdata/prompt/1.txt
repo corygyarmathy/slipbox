@@ -34,6 +34,7 @@ Run 2: The weather went into a book.
 Loss 1.2
 
 Run 2: Inspectors read the log only after a wreck.
+- Quote: "read by nobody until a ship was lost"
 - Quote: "Then the inspectors read every page."
 - Why: it says who read the log
 === END KEPT LOSSES ===
