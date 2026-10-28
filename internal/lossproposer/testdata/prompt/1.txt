@@ -1,0 +1,4 @@
+=== YOUR SEGMENT'S UNCOVERED LIST (segment 1: The Keeper’s Watch) ===
+# The Keeper's Watch
+  ¶1 PARTIAL (uncovered in CAPS): THE KEEPER trimmed the wick every four hours, AND logged the weather in a book.
+=== END ===

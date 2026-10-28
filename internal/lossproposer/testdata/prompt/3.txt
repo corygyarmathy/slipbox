@@ -1,0 +1,6 @@
+=== YOUR SEGMENT'S UNCOVERED LIST (segment 3: Storms) ===
+# Storms
+  ¶1 PARTIAL (uncovered in CAPS): A WRECK ON THE ROCKS WAS THE KEEPER'S failure, whatever the weather.
+  ¶2 PARTIAL (uncovered in CAPS): THE KEEPER stayed at the lamp (in 1839, for nine days) through every gale.
+  ¶3 UNCOVERED: I have stood in that lamp room in a gale, and the glass shook.
+=== END ===
