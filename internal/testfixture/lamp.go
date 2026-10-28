@@ -19,8 +19,10 @@ import (
 const Lamp = "Lighthouses - Ch 2 - Keepers of the Lamp"
 
 // LampChapter is the invented chapter: four segments, the first the text
-// before its first `##` heading, one heading with a curly apostrophe, and an
-// emphasized phrase. LampStage1 traces into it and LampSplit splits that.
+// before its first `##` heading, one heading with a curly apostrophe, an
+// emphasized phrase, and a sentence in the author's first person, for a
+// statement to set the author's name into (ADR 0006). LampStage1 traces
+// into it and LampSplit splits that.
 const LampChapter = `---
 source: "[[@A History of Lighthouses - Rhea Vale]]"
 ---
@@ -50,6 +52,8 @@ Obviously, a keeper can take no notice of the lens on a clear night. On a foggy 
 In a storm the light matters most. A wreck on the rocks was the keeper’s failure, whatever the weather.
 
 The keeper stayed at the lamp (in 1839, for nine days) through every gale.
+
+I have stood in that lamp room in a gale, and the glass shook.
 `
 
 // LampCitekeyLink is LampChapter's `source:` value without its YAML quotes,
