@@ -2,6 +2,8 @@ package split_test
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 
 	"github.com/corygyarmathy/slipbox/internal/fallback"
 	"github.com/corygyarmathy/slipbox/internal/note"
+	"github.com/corygyarmathy/slipbox/internal/provider"
 	"github.com/corygyarmathy/slipbox/internal/run"
 	"github.com/corygyarmathy/slipbox/internal/source"
 	"github.com/corygyarmathy/slipbox/internal/split"
@@ -43,81 +46,239 @@ func atFinal(t *testing.T, src *source.Source, notes map[string]string) *run.Fol
 	return folder
 }
 
-// stage2Prompt is segment n's user prompt as the run built it, from the
-// notes' file text: the notes block of the notes named `<n> *.md` in
-// sorted order, then the hub title and the source's name.
-func stage2Prompt(notes map[string]string, src *source.Source, n int) string {
-	var names []string
-	for name := range notes {
-		if strings.HasPrefix(name, strconv.Itoa(n)+" ") {
-			names = append(names, name)
-		}
-	}
-	slices.Sort(names)
-	label := "SEGMENT " + strconv.Itoa(n) + " STAGE 1 NOTES"
-	p := "=== " + label + " ===\n"
-	for _, name := range names {
-		p += "--- NOTE: " + name + " ---\n" + notes[name] + "\n"
-	}
-	p += "=== END " + label + " ===\n\n"
-	return p + "Hub title: `" + src.Segments[n].Title + "`. Source file name for traces: `" + src.Name + "`."
+// segment is the key a fake matches a segment's call on: the label its user
+// prompt gives the segment's notes.
+func segment(n int) string { return fmt.Sprintf("=== SEGMENT %d STAGE 1 NOTES ===", n) }
+
+// noCalls is a provider that fails t if it is called.
+func noCalls(t *testing.T) *testfixture.Fake {
+	return testfixture.NewFake(func(req provider.Request) (provider.Reply, error) {
+		t.Errorf("unexpected call: %.80q", req.User)
+		return provider.Reply{}, errors.New("unexpected call")
+	})
 }
 
-// TestRun_ReplaysThePragmatismSplit runs step 2.1 on the Pragmatism run's
-// final stage 1 notes with the run's recorded replies. Each call is the
-// request the run made, so each segment's folder holds the run's notes byte
-// for byte, its manifest is kept, and no segment falls back. Every call is
-// sent stage2Prompt's prompt, and the stage 2 brief and the frame as its
-// system prompt, at the step's tier and effort.
-func TestRun_ReplaysThePragmatismSplit(t *testing.T) {
-	src, recorded := testfixture.PragmatismSource(t), testfixture.PragmatismRun(t)
-	folder := testfixture.PragmatismFolder(t, run.FinalDir)
-	notes := testfixture.Files(t, filepath.Join(folder.Dir, filepath.FromSlash(run.FinalNotes)))
-	var prompts []string
-	for n := range src.Segments {
-		prompts = append(prompts, stage2Prompt(notes, src, n))
-	}
-	step := filepath.Join(recorded, run.SplitDir)
-	p := testfixture.Replay(t, prompts, testfixture.RawReplies(t, step, len(src.Segments)))
-	if err := split.Run(context.Background(), p, src, split.DefaultModel, folder); err != nil {
-		t.Fatal(err)
-	}
-	testfixture.SameRequests(t, filepath.Join(folder.Dir, run.SplitDir), step, "")
-
-	calls := p.Calls()
-	if len(calls) != len(src.Segments) {
-		t.Errorf("%d calls, want one per segment", len(calls))
-	}
-	frame := testfixture.PragmatismFrame(t)
-	wantSystem := testfixture.RepoFile(t, "internal/briefs/stage-2.md") + "\n\n=== FRAME: " + testfixture.Pragmatism + ".md ===\n" + frame + "\n=== END FRAME ===\n"
-	for _, c := range calls {
-		if c.Model != "sonnet" || c.Effort != "medium" || c.System != wantSystem {
-			t.Errorf("call for %.40q: model %q at %q, or its system prompt is not stage-2.md and the frame", c.User, c.Model, c.Effort)
+// TestPrompt pins each segment's user prompt on the invented chapter: its
+// own final stage 1 notes, the aside among them, then the hub title and the
+// source's name.
+func TestPrompt(t *testing.T) {
+	src, notes := testfixture.LampSource(t), testfixture.LampStage1Notes(t)
+	for _, seg := range src.Segments {
+		got, ok := split.Prompt(src, notes, seg)
+		if !ok {
+			t.Fatalf("%s: no prompt, but it has notes", seg)
 		}
-	}
-
-	got := testfixture.Files(t, filepath.Join(folder.Dir, run.SplitDir))
-	want := testfixture.Files(t, step)
-	for _, dir := range []string{run.Stage2NotesDir, run.ManifestsDir, run.RawDir} {
-		g, w := under(got, dir), under(want, dir)
-		if !reflect.DeepEqual(slices.Sorted(maps.Keys(g)), slices.Sorted(maps.Keys(w))) {
-			t.Errorf("%s/ holds %q, want the run's %q", dir, slices.Sorted(maps.Keys(g)), slices.Sorted(maps.Keys(w)))
-			continue
-		}
-		for name, text := range w {
-			if g[name] != text {
-				t.Errorf("%s/%s is not the run's", dir, name)
+		testfixture.Golden(t, "prompt/"+strconv.Itoa(seg.Number)+".txt", got)
+		// The golden files can't say why a note is in the prompt: it is one
+		// of the segment's own.
+		for _, n := range notes {
+			in := strings.Contains(got, "--- NOTE: "+n.Name+" ---\n")
+			own := strings.HasPrefix(n.Name, strconv.Itoa(seg.Number)+" ")
+			if in != own {
+				t.Errorf("%s: %q in the prompt: %v, want %v", seg, n.Name, in, own)
 			}
 		}
 	}
-	if n := len(under(got, run.Stage2NotesDir)); n != 64 {
-		t.Errorf("%d notes, want the run's 56 atomic notes and 8 hubs", n)
+	// A segment with no notes has no prompt, so no call.
+	var others []*note.Note
+	for _, n := range notes {
+		if !strings.HasPrefix(n.Name, "3 ") {
+			others = append(others, n)
+		}
 	}
-	if items, err := fallback.Read(folder, run.SplitDir); err != nil || len(items) != 0 {
-		t.Errorf("fallbacks %+v (err %v), want none", items, err)
+	if got, ok := split.Prompt(src, others, src.Segments[3]); ok {
+		t.Errorf("%s has no notes, but a prompt:\n%s", src.Segments[3], got)
 	}
-	if n := strings.Count(got[run.UsageFile], `"brief":"stage-2.md"`); n != len(src.Segments) {
-		t.Errorf("usage log names stage-2.md %d times, want once per segment:\n%s", n, got[run.UsageFile])
+}
+
+// file is a reply's `=== FILE: <name> ===` block holding body.
+func file(name, body string) string { return "=== FILE: " + name + " ===\n" + body }
+
+// lampNote is the body of the note at path in LampSplit, a split the
+// step's tests give as a reply.
+func lampNote(path string) string { return testfixture.LampSplit()[path] }
+
+// replyCase is a segment's reply in TestRun, and what the step should write
+// for it.
+type replyCase struct {
+	name    string
+	segment int
+	reply   string
+	want    written
+}
+
+// written is what step 2.1 writes for a segment: its notes, by file name in
+// its folder, and its manifest; or, for a reply that falls back, neither,
+// and why it falls back.
+type written struct {
+	notes    map[string]string
+	manifest string
+	fallback string
+}
+
+// replyCases are the replies of the invented chapter's four segments, one
+// call each.
+var replyCases = []replyCase{
+	// The well-formed shape: the atomic notes, the hub and a manifest, each
+	// written as given.
+	{"well-formed", 0,
+		file("A Lighthouse Is a Promise.md", lampNote("0 Keepers of the Lamp/A Lighthouse Is a Promise.md")) +
+			file("The Keeper Kept the Promise.md", lampNote("0 Keepers of the Lamp/The Keeper Kept the Promise.md")) +
+			file("Keepers of the Lamp.md", lampNote("0 Keepers of the Lamp/Keepers of the Lamp.md")) +
+			"=== MANIFEST ===\n{\"segment\": \"2. Keepers of the Lamp\", \"edited_statements\": []}\n",
+		written{
+			notes: map[string]string{
+				"A Lighthouse Is a Promise.md":   lampNote("0 Keepers of the Lamp/A Lighthouse Is a Promise.md"),
+				"The Keeper Kept the Promise.md": lampNote("0 Keepers of the Lamp/The Keeper Kept the Promise.md"),
+				"Keepers of the Lamp.md":         lampNote("0 Keepers of the Lamp/Keepers of the Lamp.md"),
+			},
+			manifest: "{\"segment\": \"2. Keepers of the Lamp\", \"edited_statements\": []}\n",
+		}},
+	// A preamble before the first file, which is no note; a note named
+	// without `.md`, which is written with it; the aside's note beside the
+	// main note's; and a manifest after a blank line with no trailing
+	// newline, kept as the runner parses its block: trimmed, with one
+	// trailing newline.
+	{"a preamble, a name without .md, the aside, and a manifest with no trailing newline", 1,
+		"Here is the split.\n\n" +
+			file("The Watch Began at Dusk", lampNote("1 The Keeper's Watch/The Watch Began at Dusk.md")) +
+			file("The Log Was Read Only After a Wreck.md", lampNote("1 The Keeper's Watch/The Log Was Read Only After a Wreck.md")) +
+			file("The Keeper's Watch.md", lampNote("1 The Keeper's Watch/The Keeper's Watch.md")) +
+			"=== MANIFEST ===\n\n{\"segment\": \"The Keeper’s Watch\"}",
+		written{
+			notes: map[string]string{
+				"The Watch Began at Dusk.md":             lampNote("1 The Keeper's Watch/The Watch Began at Dusk.md"),
+				"The Log Was Read Only After a Wreck.md": lampNote("1 The Keeper's Watch/The Log Was Read Only After a Wreck.md"),
+				"The Keeper's Watch.md":                  lampNote("1 The Keeper's Watch/The Keeper's Watch.md"),
+			},
+			manifest: "{\"segment\": \"The Keeper’s Watch\"}\n",
+		}},
+	// A hub under a name that isn't the segment's title falls back, though
+	// the reply has a note besides its atomic ones: the hub is the note named
+	// `<title>.md`. The other segments are written.
+	{"a hub under another name falls back", 2,
+		file("The Lens Makes a Beam.md", lampNote("2 The Lens/The Lens Makes a Beam.md")) +
+			file("Rings of Prisms.md", lampNote("2 The Lens/Rings of Prisms.md")) +
+			file("Lens.md", lampNote("2 The Lens/The Lens.md")) +
+			"=== MANIFEST ===\n{}\n",
+		written{fallback: `step 2.1's reply wrote no hub note "The Lens.md"`}},
+	// A note given twice under one name is written once, with the later
+	// body: a model that writes a note again means the later version.
+	{"a note given twice under one name", 3,
+		file("In a Storm the Light Matters Most.md", "# In a Storm the Light Matters Most\n\nA first draft.\n") +
+			file("The Keeper Stayed Through Every Gale.md", lampNote("3 Storms/The Keeper Stayed Through Every Gale.md")) +
+			file("In a Storm the Light Matters Most.md", lampNote("3 Storms/In a Storm the Light Matters Most.md")) +
+			file("Storms.md", lampNote("3 Storms/Storms.md")) +
+			"=== MANIFEST ===\n{}\n",
+		written{
+			notes: map[string]string{
+				"In a Storm the Light Matters Most.md":    lampNote("3 Storms/In a Storm the Light Matters Most.md"),
+				"The Keeper Stayed Through Every Gale.md": lampNote("3 Storms/The Keeper Stayed Through Every Gale.md"),
+				"Storms.md": lampNote("3 Storms/Storms.md"),
+			},
+			manifest: "{}\n",
+		}},
+}
+
+// TestRun runs step 2.1 on the invented chapter's final stage 1 notes with
+// replyCases, and checks the calls it made and what it wrote.
+func TestRun(t *testing.T) {
+	src := testfixture.LampSource(t)
+	folder := atFinal(t, src, testfixture.LampStage1())
+	var cases []testfixture.Case
+	for _, c := range replyCases {
+		cases = append(cases, testfixture.Case{Contains: segment(c.segment), Reply: c.reply})
+	}
+	p := testfixture.Serve(t, cases...)
+	if err := split.Run(context.Background(), p, src, split.DefaultModel, folder); err != nil {
+		t.Fatal(err)
+	}
+
+	files := testfixture.Files(t, filepath.Join(folder.Dir, run.SplitDir))
+	items, err := fallback.Read(folder, run.SplitDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wantItems []fallback.Item
+	wantFolders := map[string]bool{}
+	for _, c := range replyCases {
+		seg := src.Segments[c.segment]
+		n := strconv.Itoa(c.segment)
+		if c.want.fallback != "" {
+			wantItems = append(wantItems, fallback.Item{Segment: c.segment, Why: c.want.fallback})
+		} else {
+			wantFolders[split.Folder(seg)] = true
+		}
+		t.Run(c.name, func(t *testing.T) {
+			if got := files[run.RawDir+"/"+n+".txt"]; got != c.reply {
+				t.Errorf("raw reply is not the reply:\n got %q\nwant %q", got, c.reply)
+			}
+			if got := under(files, run.Stage2NotesDir+"/"+split.Folder(seg)); !maps.Equal(got, c.want.notes) {
+				t.Errorf("notes in %s/:\n got %q\nwant %q", split.Folder(seg), got, c.want.notes)
+			}
+			manifest, ok := files[run.ManifestsDir+"/"+n+".json"]
+			if c.want.fallback != "" && ok {
+				t.Errorf("a reply that falls back has a manifest %q", manifest)
+			}
+			if c.want.fallback == "" && manifest != c.want.manifest {
+				t.Errorf("manifest %q, want %q", manifest, c.want.manifest)
+			}
+			var why string
+			for _, it := range items {
+				if it.Segment == c.segment {
+					why = it.Why
+				}
+			}
+			if why != c.want.fallback {
+				t.Errorf("falls back for %q, want %q", why, c.want.fallback)
+			}
+		})
+	}
+	// Only the segments whose replies don't fall back have folders, and the
+	// fallbacks are listed in segment order.
+	got := map[string]bool{}
+	for path := range under(files, run.Stage2NotesDir) {
+		dir, _, _ := strings.Cut(path, "/")
+		got[dir] = true
+	}
+	if !reflect.DeepEqual(got, wantFolders) {
+		t.Errorf("%s/ holds folders %v, want %v", run.Stage2NotesDir, slices.Sorted(maps.Keys(got)), slices.Sorted(maps.Keys(wantFolders)))
+	}
+	if !reflect.DeepEqual(items, wantItems) {
+		t.Errorf("fallbacks %+v, want %+v", items, wantItems)
+	}
+
+	// One call per segment, segment 0's first, each with its prompt,
+	// briefed by the stage 2 brief and the frame, at sonnet and medium. The
+	// system prompt is built here rather than with modelstep.SystemPrompt,
+	// so a fault there still shows.
+	wantSystem := testfixture.RepoFile(t, "internal/briefs/stage-2.md") +
+		"\n\n=== FRAME: " + testfixture.Lamp + ".md ===\n" + testfixture.LampChapter + "\n=== END FRAME ===\n"
+	calls := p.Calls()
+	if len(calls) != len(src.Segments) {
+		t.Fatalf("%d calls, want one per segment (%d)", len(calls), len(src.Segments))
+	}
+	users := map[string]bool{}
+	for _, c := range calls {
+		if c.System != wantSystem {
+			t.Errorf("call for %.80q: system prompt is not stage-2.md and the frame", c.User)
+		}
+		if c.Model != "sonnet" || c.Effort != "medium" {
+			t.Errorf("call for %.80q: model %q at effort %q, want sonnet at medium", c.User, c.Model, c.Effort)
+		}
+		users[c.User] = true
+	}
+	notes := testfixture.LampStage1Notes(t)
+	for _, seg := range src.Segments {
+		if want, _ := split.Prompt(src, notes, seg); !users[want] {
+			t.Errorf("%s: no call has its prompt %q", seg, want)
+		}
+	}
+	if !strings.Contains(calls[0].User, segment(0)) {
+		t.Errorf("first call was not segment 0's: %.80q", calls[0].User)
+	}
+	if n := strings.Count(files[run.UsageFile], `"brief":"stage-2.md"`); n != len(src.Segments) {
+		t.Errorf("usage log names stage-2.md %d times, want once per segment:\n%s", n, files[run.UsageFile])
 	}
 }
 
@@ -158,7 +319,7 @@ func TestRun_SkipsASegmentWithNoNotes(t *testing.T) {
 	folder := atFinal(t, src, notes)
 	// The manifest ends with no newline, as some of the model's do.
 	reply := "=== FILE: Alpha Is First.md ===\nalpha\n=== FILE: Tiny.md ===\nhub\n=== MANIFEST ===\n\n{}"
-	p := testfixture.Replay(t, []string{stage2Prompt(notes, src, 0)}, []string{reply})
+	p := testfixture.Serve(t, testfixture.Case{Contains: segment(0), Reply: reply})
 	if err := split.Run(context.Background(), p, src, "opus", folder); err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +359,7 @@ func TestRun_ABadReplyFallsBack(t *testing.T) {
 		{"=== FILE: Tiny ===\nhub\n=== MANIFEST ===\n{}\n", "step 2.1's reply wrote no atomic note"},
 	} {
 		folder := atFinal(t, src, notes)
-		p := testfixture.Replay(t, []string{stage2Prompt(notes, src, 0)}, []string{c.reply})
+		p := testfixture.Serve(t, testfixture.Case{Contains: segment(0), Reply: c.reply})
 		if err := split.Run(context.Background(), p, src, split.DefaultModel, folder); err != nil {
 			t.Errorf("reply %q: %v", c.reply, err)
 			continue
@@ -223,7 +384,7 @@ func TestRun_ABadReplyFallsBack(t *testing.T) {
 			if err := os.Rename(step, step+run.PartialSuffix); err != nil {
 				t.Fatal(err)
 			}
-			if err := split.Run(context.Background(), testfixture.Replay(t, nil, nil), src, split.DefaultModel, folder); err != nil {
+			if err := split.Run(context.Background(), noCalls(t), src, split.DefaultModel, folder); err != nil {
 				t.Fatalf("reply %q: resume: %v", c.reply, err)
 			}
 		}
@@ -272,7 +433,7 @@ func TestRun_RefusesATitleThatCantNameAFolder(t *testing.T) {
 	}
 	notes := map[string]string{"0 Tiny.md": tinyNote0}
 	folder := atFinal(t, src, notes)
-	p := testfixture.Replay(t, nil, nil)
+	p := noCalls(t)
 	if err := split.Run(context.Background(), p, src, split.DefaultModel, folder); err == nil {
 		t.Errorf("no error")
 	}
@@ -310,7 +471,7 @@ func TestRun_EveryReplyFallsBackThenGates(t *testing.T) {
 	notes := map[string]string{"0 Tiny.md": tinyNote0}
 	folder := atFinal(t, src, notes)
 	reply := "=== FILE: Alpha Is First.md ===\nalpha\n=== MANIFEST ===\n{}\n"
-	p := testfixture.Replay(t, []string{stage2Prompt(notes, src, 0)}, []string{reply})
+	p := testfixture.Serve(t, testfixture.Case{Contains: segment(0), Reply: reply})
 	if err := split.Run(context.Background(), p, src, split.DefaultModel, folder); err != nil {
 		t.Fatal(err)
 	}
