@@ -120,8 +120,7 @@ staged.
   each step's reply cases, deterministic output on golden files under
   `testdata/`, and orchestration end to end on short invented replies. A
   trial is an eval the maintainer runs, whose report is read, not asserted
-  on. `testdata/sources/` holds a public-domain chapter. The recorded run on
-  it in `testdata/trials/` stays only until the tests are migrated off it.
+  on.
 
 ## Out of scope
 

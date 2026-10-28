@@ -1,7 +1,0 @@
-# 5 Rationalistic Criticisms
-
-- [dangling] "A hailstorm of contempt and ridicule throws so much sidelight upon that rationalistic temper…": "that rationalistic temper", "the temper of pragmatism": the note never introduces these tempers or says what the opposition between them is. "That" and "the" treat them as already established.
-- [dangling] "Pragmatism only follows here the example of the sister-sciences…": "here", "the sister-sciences": no earlier statement says which sciences are meant or what "here" points to.
-- [dangling] "It brings old and new harmoniously together.": "old and new": it is not stated what is old and what is new.
-
-pass 19 / dangling 3 / outside-frame 0

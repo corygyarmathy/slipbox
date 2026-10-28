@@ -1,5 +1,0 @@
-# 4 The Formation of New Beliefs
-
-- [dangling] "The trail of the human serpent is thus over everything.": "the human serpent": no earlier statement in the note introduces a serpent or says what it stands for, so the definite description is used as if already known.
-
-pass 43 / dangling 1 / outside-frame 0

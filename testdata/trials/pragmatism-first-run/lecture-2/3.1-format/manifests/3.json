@@ -1,6 +1,0 @@
-{"segment": "Pragmatism as a Theory of Truth",
- "changes": [{"note": "Ideas Become True Just in So Far as They Help Us", "element": "_x_", "what": "underscores around the all-caps definition clause", "judgement": "mechanical", "why": "the edition's CAPS mark its italics"},
- {"note": "Men Believed Laws Deciphered the Thoughts of the Almighty", "element": "_x_", "what": "underscores around LAWS", "judgement": "mechanical", "why": "the edition's CAPS mark its italics"},
- {"note": "The Instrumental View of Truth", "element": "_x_", "what": "underscores around INSTRUMENTALLY", "judgement": "mechanical", "why": "the edition's CAPS mark its italics"}],
- "unchanged_notes": ["Following the Example of Geologists, Biologists and Philologists", "Human Arbitrariness Has Driven Divine Necessity from Scientific Logic", "Inductive Logic", "Laws Are Only Approximations", "Pragmatism as a Theory of Truth"],
- "hard_calls": ["Ideas Become True Just in So Far as They Help Us: the sentence sets out Schiller and Dewey's definition of truth, but the source gives it no rule name, so no [!Info] callout is added.", "The source's CAPS are kept as caps, since recasing is not allowed; they are only wrapped in underscores."]}

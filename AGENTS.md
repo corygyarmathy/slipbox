@@ -14,10 +14,6 @@ the standard library (ADR 0001).
   re-trial.
 - [`GLOSSARY.md`](GLOSSARY.md) - the vocabulary.
 - [`docs/adr/`](docs/adr/) - the decisions, and the reasoning behind them.
-- [`testdata/sources/`](testdata/sources/) - Pragmatism Lecture II, a
-  public-domain chapter.
-- `testdata/trials/` - the recorded run the tests are being migrated off,
-  and hand-written replies. It's deleted once no test opens it (ADR 0002 §8).
 - The private archive,
   [`corygyarmathy/source-to-notes`](https://github.com/corygyarmathy/source-to-notes)
   (private), holds the trials behind the ADRs: their chapters and outputs, the
@@ -43,9 +39,7 @@ the standard library (ADR 0001).
   deterministic output on golden files under `testdata/`, regenerated with
   `-update`. Keep end-to-end tests to orchestration, on short invented
   replies. A trial is an eval the maintainer runs, not a fixture: don't copy
-  one in for a test to assert against. Until the tests are migrated off the
-  recorded run, a change that breaks them is flagged to the maintainer, not
-  fixed by recording it again.
+  one in for a test to assert against.
 - Write the reason into the comment, package doc or ADR. Don't point to an
   issue or PR in its place: an ADR may cite one as evidence, but needing to
   cite one elsewhere means documentation is missing.
