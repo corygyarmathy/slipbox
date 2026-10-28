@@ -1,0 +1,4 @@
+=== YOUR SEGMENT'S UNCOVERED LIST (segment 2: The Lens) ===
+# The Lens
+  ¶3 PARTIAL (uncovered in CAPS): THE FRESNEL LENS uses rings of prisms instead of one thick glass.
+=== END ===
