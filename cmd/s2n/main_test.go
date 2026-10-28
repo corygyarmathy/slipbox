@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/corygyarmathy/slipbox/internal/extract"
@@ -449,23 +450,43 @@ func TestRun_NoVaultStopsBeforeAnyCall(t *testing.T) {
 	}
 }
 
+// A statement step 1.4 repaired that its re-check still flags stops
+// nothing: the run report lists it, with the re-check's grade.
+func TestRun_RepairFailingRecheckIsReported(t *testing.T) {
+	const stillDangling = "# 1 The Keeper's Watch\n\n" +
+		"- [dangling] \"The keeper also logged the weather in a book.\": \"also\" follows nothing.\n" +
+		"pass 2 / dangling 1 / outside-frame 0\n"
+	over := lampEveryStep()
+	over[run.ReadsAloneDir][1] = append(over[run.ReadsAloneDir][1], stillDangling)
+	runDir, _, _ := lampRun(t, over, "-stop-after", run.RunReportDir)
+	const want = "- 1 The Keeper's Watch: The keeper[^3] also logged the weather in a book.[^4] (1.3b dangling: \"also\" follows nothing.)"
+	if fails := runReport(t, runDir)["Statements that still fail"]; !strings.Contains(fails, want) {
+		t.Errorf("Statements that still fail has no %q:\n%s", want, fails)
+	}
+}
+
 // servePrompts returns a Fake that answers a call whose user prompt is
 // prompts[i] with replies[i], so a test on an invented source checks that
 // each step was given what the steps before it wrote, by giving no reply
-// to any other prompt: that fails the test, and the call. A prompt given
-// more than once is given its last reply.
+// to any other prompt: that fails the test, and the call. Each reply is
+// given once, in order for a prompt listed more than once, so a call made
+// more often than listed fails too.
 func servePrompts(t *testing.T, prompts, replies []string) *testfixture.Fake {
 	t.Helper()
 	if len(prompts) != len(replies) {
 		t.Fatalf("%d prompts for %d replies", len(prompts), len(replies))
 	}
-	m := map[string]string{}
+	var mu sync.Mutex
+	m := map[string][]string{}
 	for i, p := range prompts {
-		m[p] = replies[i]
+		m[p] = append(m[p], replies[i])
 	}
 	return testfixture.NewFake(func(req provider.Request) (provider.Reply, error) {
-		if r, ok := m[req.User]; ok {
-			return provider.Reply{Text: r}, nil
+		mu.Lock()
+		defer mu.Unlock()
+		if rs := m[req.User]; len(rs) > 0 {
+			m[req.User] = rs[1:]
+			return provider.Reply{Text: rs[0]}, nil
 		}
 		t.Errorf("no reply for the user prompt %.80q", req.User)
 		return provider.Reply{}, fmt.Errorf("no reply for the user prompt %.80q", req.User)
@@ -585,7 +606,7 @@ func keys(m map[string]string) []string {
 }
 
 // TestRun_GoesUnattendedToStageOut runs `s2n run` once on a one-segment
-// source, with replayed replies for every step, from step 1.1 to stage out
+// source, with invented replies for every step, from step 1.1 to stage out
 // (ADR 0009). Nothing stops it: step 1.5's one proposed loss is added with
 // no review, no segment falls back, and the run report goes into the
 // staging folder with the notes.
@@ -750,7 +771,7 @@ func TestResumeCommand_SourceNotUTF8(t *testing.T) {
 }
 
 // TestRun_FallsBack runs `s2n run` from step 1.1 to stage out on a source of
-// two segments, with replayed replies, in which a segment fails a stage 2 or
+// two segments, with invented replies, in which a segment fails a stage 2 or
 // 3 step (ADR 0009). Nothing stops the run. A segment that fails step 2.1
 // or its gates is staged as its final stage 1 notes, stripped and with a
 // source footnote, under a generated hub. One that fails step 3.1 or its gate
