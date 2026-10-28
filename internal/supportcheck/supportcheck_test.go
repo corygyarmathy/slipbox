@@ -15,7 +15,6 @@ import (
 
 	"github.com/corygyarmathy/slipbox/internal/checker"
 	"github.com/corygyarmathy/slipbox/internal/run"
-	"github.com/corygyarmathy/slipbox/internal/source"
 	"github.com/corygyarmathy/slipbox/internal/supportcheck"
 	"github.com/corygyarmathy/slipbox/internal/testfixture"
 )
@@ -123,27 +122,11 @@ var replyCases = []replyCase{
 		}},
 }
 
-// extractFolder makes a run folder for the invented chapter whose step 1.1
-// wrote its stage 1 notes.
-func extractFolder(t *testing.T) (*source.Source, *run.Folder) {
-	t.Helper()
-	src := testfixture.LampSource(t)
-	folder, err := run.New(filepath.Join(t.TempDir(), "run"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := folder.SaveSource(src.Name, []byte(src.Frame)); err != nil {
-		t.Fatal(err)
-	}
-	testfixture.WriteFiles(t, filepath.Join(folder.Dir, filepath.FromSlash(run.ExtractNotes)), testfixture.LampStage1())
-	return src, folder
-}
-
 // TestRun runs step 1.3a on the invented chapter, serving each segment its
 // reply case, and checks the requests it made and the reports and flags it
 // wrote.
 func TestRun(t *testing.T) {
-	src, folder := extractFolder(t)
+	src, folder := testfixture.LampExtractRun(t)
 	var cases []testfixture.Case
 	for _, c := range replyCases {
 		cases = append(cases, testfixture.Case{Contains: fmt.Sprintf("(segment %d: ", c.segment), Reply: c.reply})
