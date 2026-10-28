@@ -97,10 +97,15 @@ const fresnel = "---\ntags: [lighthouses]\n---\n# Rings of Prisms[^1]\n\n" +
 	"_The Fresnel lens_ uses rings of prisms instead of one thick glass.\n\n" +
 	"[^1]: " + testfixture.LampCitekeyLink + "\n"
 
+// fresnelManifest is the manifest of the change fresnel makes.
+const fresnelManifest = `{"changes": [{"note": "Rings of Prisms", "element": "_x_", "what": "*x* to _x_", "judgement": "mechanical", "why": "the source italicises it"}]}`
+
+// mustGiveBack ends the fault of a reply whose notes aren't its segment's.
+const mustGiveBack = ", but it must give back every note of its segment, as named"
+
 // replyCases are the replies of the invented chapter's four segments, one
 // call each.
 func replyCases(t *testing.T) []replyCase {
-	const whole = ", but it must give back every note of its segment, as named"
 	return []replyCase{
 		// A note given back under another name falls back, though the reply
 		// gives as many notes as the segment has: the notes are matched by
@@ -110,7 +115,7 @@ func replyCases(t *testing.T) []replyCase {
 				file("Keepers of the Lamp.md", lampNote(t, "0 Keepers of the Lamp/Keepers of the Lamp.md")) +
 				file("The Keeper Kept His Promise.md", strings.Replace(lampNote(t, "0 Keepers of the Lamp/The Keeper Kept the Promise.md"), "Kept the", "Kept His", 1)) +
 				"=== MANIFEST ===\n{\"changes\": []}\n",
-			written{fallback: `step 3.1's reply left out ["The Keeper Kept the Promise.md"] and wrote ["The Keeper Kept His Promise.md"], not notes of the segment` + whole}},
+			written{fallback: `step 3.1's reply left out ["The Keeper Kept the Promise.md"] and wrote ["The Keeper Kept His Promise.md"], not notes of the segment` + mustGiveBack}},
 		// "No change" is a correct result: every note is written as it was.
 		// A preamble before the first file is no note; a note named without
 		// `.md` is written with it; the hub may come first, out of the
@@ -140,7 +145,7 @@ func replyCases(t *testing.T) []replyCase {
 				file("The Lens Makes a Beam.md", lampNote(t, "2 The Lens/The Lens Makes a Beam.md")) +
 				file("A Keeper Need Not Watch the Lens.md", lampNote(t, "2 The Lens/A Keeper Need Not Watch the Lens.md")) +
 				file("Rings of Prisms.md", fresnel) +
-				"=== MANIFEST ===\n" + `{"changes": [{"note": "Rings of Prisms", "element": "_x_", "what": "*x* to _x_", "judgement": "mechanical", "why": "the source italicises it"}]}` + "\n",
+				"=== MANIFEST ===\n" + fresnelManifest + "\n",
 			written{
 				notes: map[string]string{
 					"The Lens.md":                         lampNote(t, "2 The Lens/The Lens.md"),
@@ -148,7 +153,7 @@ func replyCases(t *testing.T) []replyCase {
 					"A Keeper Need Not Watch the Lens.md": lampNote(t, "2 The Lens/A Keeper Need Not Watch the Lens.md"),
 					"Rings of Prisms.md":                  fresnel,
 				},
-				manifest: `{"changes": [{"note": "Rings of Prisms", "element": "_x_", "what": "*x* to _x_", "judgement": "mechanical", "why": "the source italicises it"}]}` + "\n",
+				manifest: fresnelManifest + "\n",
 			}},
 		// A note of another segment falls back, though the run has a note
 		// of that name: a reply may give back only its own segment's notes.
@@ -158,7 +163,7 @@ func replyCases(t *testing.T) []replyCase {
 				file("The Keeper Stayed Through Every Gale.md", lampNote(t, "3 Storms/The Keeper Stayed Through Every Gale.md")) +
 				file("The Lens.md", lampNote(t, "2 The Lens/The Lens.md")) +
 				"=== MANIFEST ===\n{\"changes\": []}\n",
-			written{fallback: `step 3.1's reply wrote ["The Lens.md"], not notes of the segment` + whole}},
+			written{fallback: `step 3.1's reply wrote ["The Lens.md"], not notes of the segment` + mustGiveBack}},
 	}
 }
 
@@ -341,17 +346,16 @@ func TestRun_ABadReplyFallsBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	const tail = "=== MANIFEST ===\n{}\n"
-	const whole = ", but it must give back every note of its segment, as named"
 	for name, c := range map[string]struct{ reply, why string }{
 		"escape":    {"=== FILE: ../Alpha Is First.md ===\nx\n=== FILE: Tiny.md ===\nhub\n" + tail, `named a note "../Alpha Is First.md", not a plain file name`},
 		"delete":    {"=== DELETE: Alpha Is First.md ===\n=== FILE: Tiny.md ===\nhub\n" + tail, `gave "Alpha Is First.md" as a delete or edits, not a whole note`},
 		"edit":      {"=== EDIT: Alpha Is First.md ===\nx\n=== FILE: Tiny.md ===\nhub\n" + tail, `gave "Alpha Is First.md" as a delete or edits, not a whole note`},
 		"twice":     {"=== FILE: Alpha Is First ===\nx\n=== FILE: Alpha Is First.md ===\ny\n=== FILE: Tiny.md ===\nhub\n" + tail, `wrote "Alpha Is First.md" twice`},
-		"missing":   {"=== FILE: Alpha Is First.md ===\nalpha\n" + tail, `left out ["Tiny.md"]` + whole},
-		"extra":     {"=== FILE: Alpha Is First.md ===\nalpha\n=== FILE: Tiny.md ===\nhub\n=== FILE: Beta.md ===\nbeta\n" + tail, `wrote ["Beta.md"], not notes of the segment` + whole},
-		"renamed":   {"=== FILE: Alpha Comes First.md ===\nalpha\n=== FILE: Tiny.md ===\nhub\n" + tail, `left out ["Alpha Is First.md"] and wrote ["Alpha Comes First.md"], not notes of the segment` + whole},
-		"no notes":  {tail, `left out ["Alpha Is First.md" "Tiny.md"]` + whole},
-		"no blocks": {"No change.\n", `left out ["Alpha Is First.md" "Tiny.md"]` + whole},
+		"missing":   {"=== FILE: Alpha Is First.md ===\nalpha\n" + tail, `left out ["Tiny.md"]` + mustGiveBack},
+		"extra":     {"=== FILE: Alpha Is First.md ===\nalpha\n=== FILE: Tiny.md ===\nhub\n=== FILE: Beta.md ===\nbeta\n" + tail, `wrote ["Beta.md"], not notes of the segment` + mustGiveBack},
+		"renamed":   {"=== FILE: Alpha Comes First.md ===\nalpha\n=== FILE: Tiny.md ===\nhub\n" + tail, `left out ["Alpha Is First.md"] and wrote ["Alpha Comes First.md"], not notes of the segment` + mustGiveBack},
+		"no notes":  {tail, `left out ["Alpha Is First.md" "Tiny.md"]` + mustGiveBack},
+		"no blocks": {"No change.\n", `left out ["Alpha Is First.md" "Tiny.md"]` + mustGiveBack},
 	} {
 		t.Run(name, func(t *testing.T) {
 			folder := atStripped(t, src, tinyStripped)
