@@ -108,7 +108,7 @@ func TestRun_Lamp(t *testing.T) {
 		for _, b := range briefFiles {
 			text = append(text, testfixture.RepoFile(t, "internal/briefs/"+b))
 		}
-		s := strings.Join(text, "\n\n") + "\n\n" + lampFrame
+		s := strings.Join(text, "\n\n") + "\n\n" + testfixture.LampFrame
 		if shared != "" {
 			s += "\n" + shared
 		}

@@ -163,7 +163,7 @@ func TestRun(t *testing.T) {
 
 	notes := testfixture.LampStage1Notes(t)
 	brief := testfixture.RepoFile(t, "internal/briefs/checker-support.md")
-	wantSystem := brief + "\n\n=== FRAME: " + testfixture.Lamp + ".md ===\n" + testfixture.LampChapter + "\n=== END FRAME ===\n\n" + supportcheck.Shared(notes)
+	wantSystem := brief + "\n\n" + testfixture.LampFrame + "\n" + supportcheck.Shared(notes)
 	calls := p.Calls()
 	if len(calls) != len(src.Segments) {
 		t.Fatalf("%d calls, want one per segment (%d)", len(calls), len(src.Segments))

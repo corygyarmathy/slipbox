@@ -243,7 +243,7 @@ func TestRun(t *testing.T) {
 	// system prompt is built here rather than with modelstep.SystemPrompt,
 	// so a fault there still shows.
 	wantSystem := testfixture.RepoFile(t, "internal/briefs/stage-3.md") +
-		"\n\n=== FRAME: " + testfixture.Lamp + ".md ===\n" + testfixture.LampChapter + "\n=== END FRAME ===\n"
+		"\n\n" + testfixture.LampFrame
 	calls := p.Calls()
 	if len(calls) != len(src.Segments) {
 		t.Fatalf("%d calls, want one per segment (%d)", len(calls), len(src.Segments))

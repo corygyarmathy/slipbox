@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/corygyarmathy/slipbox/internal/note"
@@ -56,6 +57,13 @@ The keeper stayed at the lamp (in 1839, for nine days) through every gale.
 
 I have stood in that lamp room in a gale, and the glass shook.
 `
+
+// LampFrame is the frame of every system prompt on LampChapter, as it
+// follows the brief and a blank line: the chapter as it is on disk, not the
+// parsed source's Frame, so a fault in parsing still shows. A test builds
+// its expected system prompt from it rather than with
+// modelstep.SystemPrompt, so a fault there still shows too.
+const LampFrame = "=== FRAME: " + Lamp + ".md ===\n" + LampChapter + "\n=== END FRAME ===\n"
 
 // LampCitekeyLink is LampChapter's `source:` value without its YAML quotes,
 // the source footnote strip traces gives each atomic note.
@@ -226,6 +234,18 @@ func LampStage1Notes(t testing.TB) []*note.Note {
 		t.Fatalf("testfixture: %v", err)
 	}
 	return notes
+}
+
+// SegmentNotes gives the notes in files, by file name, whose names start
+// with segment n's number, such as segment 1's of LampStage1.
+func SegmentNotes(files map[string]string, n int) map[string]string {
+	out := map[string]string{}
+	for name, text := range files {
+		if strings.HasPrefix(name, strconv.Itoa(n)+" ") {
+			out[name] = text
+		}
+	}
+	return out
 }
 
 // LampFolders reads the segment folders of a split, files by slash-separated

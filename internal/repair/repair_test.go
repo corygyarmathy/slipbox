@@ -96,25 +96,13 @@ func stillFails(t *testing.T, folder *run.Folder) []repair.Entry {
 	return entries
 }
 
-// segmentNotes gives the notes in files, by file name, whose names start
-// with segment n's number.
-func segmentNotes(files map[string]string, n int) map[string]string {
-	out := map[string]string{}
-	for name, text := range files {
-		if strings.HasPrefix(name, strconv.Itoa(n)+" ") {
-			out[name] = text
-		}
-	}
-	return out
-}
-
 // wantSystem is the system prompt of a repair call on the invented chapter
 // briefed by brief, then rules, files in internal/briefs/. It is built here
 // rather than with repair.Brief, so a fault there still shows.
 func wantSystem(t *testing.T, brief, rules string) string {
 	t.Helper()
 	return testfixture.RepoFile(t, "internal/briefs/"+brief) + "\n\n" + testfixture.RepoFile(t, "internal/briefs/"+rules) +
-		"\n\n=== FRAME: " + testfixture.Lamp + ".md ===\n" + testfixture.LampChapter + "\n=== END FRAME ===\n"
+		"\n\n" + testfixture.LampFrame
 }
 
 // briefFiles names each reply shape's brief, then its rules, files in
@@ -334,13 +322,13 @@ func TestRun(t *testing.T) {
 			if got := files[run.ReportsDir+"/"+n+".md"]; got != c.report {
 				t.Errorf("segment %d: report %q, want %q", c.segment, got, c.report)
 			}
-			if got := segmentNotes(repaired, c.segment); !reflect.DeepEqual(got, c.notes) {
+			if got := testfixture.SegmentNotes(repaired, c.segment); !reflect.DeepEqual(got, c.notes) {
 				t.Errorf("segment %d: repaired notes:\n got %q\nwant %q", c.segment, got, c.notes)
 			}
 		})
 	}
 	// Segment 0, which has no call, keeps step 1.1's notes.
-	if got, want := segmentNotes(repaired, 0), segmentNotes(testfixture.LampStage1(), 0); !reflect.DeepEqual(got, want) {
+	if got, want := testfixture.SegmentNotes(repaired, 0), testfixture.SegmentNotes(testfixture.LampStage1(), 0); !reflect.DeepEqual(got, want) {
 		t.Errorf("segment 0's notes are not step 1.1's:\n got %q\nwant %q", got, want)
 	}
 	if items, err := dropped.Read(folder, run.RepairDir); err != nil || len(items) != 0 {
@@ -681,11 +669,11 @@ func TestRun_Replies(t *testing.T) {
 			}
 
 			repaired := testfixture.Files(t, filepath.Join(folder.Dir, filepath.FromSlash(run.RepairNotes)))
-			if got := segmentNotes(repaired, 1); !reflect.DeepEqual(got, c.notes) {
+			if got := testfixture.SegmentNotes(repaired, 1); !reflect.DeepEqual(got, c.notes) {
 				t.Errorf("segment 1's notes:\n got %q\nwant %q", got, c.notes)
 			}
 			for _, n := range []int{0, 2, 3} {
-				if got, want := segmentNotes(repaired, n), segmentNotes(testfixture.LampStage1(), n); !reflect.DeepEqual(got, want) {
+				if got, want := testfixture.SegmentNotes(repaired, n), testfixture.SegmentNotes(testfixture.LampStage1(), n); !reflect.DeepEqual(got, want) {
 					t.Errorf("segment %d's notes are not step 1.1's", n)
 				}
 			}
@@ -702,7 +690,7 @@ func TestRun_Replies(t *testing.T) {
 				t.Fatal(err)
 			}
 			want := []int{}
-			if !reflect.DeepEqual(c.notes, segmentNotes(testfixture.LampStage1(), 1)) {
+			if !reflect.DeepEqual(c.notes, testfixture.SegmentNotes(testfixture.LampStage1(), 1)) {
 				want = []int{1}
 			}
 			if !reflect.DeepEqual(changed, want) {
