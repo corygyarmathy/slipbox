@@ -1,0 +1,53 @@
+=== YOUR SEGMENT'S NOTES (segment 1: The Keeper’s Watch) ===
+--- NOTE: 1 The Keeper's Watch - Aside - The log ---
+# 1 The Keeper's Watch - Aside - The log
+
+The log was read by nobody until a ship was lost.[^1]
+Then they read every page.[^2]
+
+[^1]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Keeper’s Watch]] "The log was read by nobody until a ship was lost."
+[^2]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Keeper’s Watch]] "read every page"
+
+--- NOTE: 1 The Keeper's Watch ---
+# 1 The Keeper's Watch
+
+The watch began at dusk.[^1]
+He trimmed the wick every four hours.[^2]
+He logged the weather in a book.[^3]
+
+[^1]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Keeper’s Watch]] "The watch began at dusk."
+[^2]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Keeper’s Watch]] "trimmed the wick every four hours"
+[^3]: [[Lighthouses - Ch 2 - Keepers of the Lamp#The Keeper’s Watch]] "logged the weather in a book"
+
+=== END YOUR SEGMENT'S NOTES (segment 1: The Keeper’s Watch) ===
+
+=== MECHANICAL CHECK ===
+### 1 The Keeper's Watch - Aside - The log.md
+
+### 1 The Keeper's Watch.md
+=== END MECHANICAL CHECK ===
+
+=== SUPPORT AND CUTS CHECK ===
+# 1 The Keeper's Watch
+
+- [cut would do] "He trimmed the wick…": a cut to "The keeper" would name him.
+pass 2 / cut would do 1
+
+# 1 The Keeper's Watch - Aside - The log
+
+pass 2
+
+=== END SUPPORT AND CUTS CHECK ===
+
+=== READS-ALONE CHECK ===
+# 1 The Keeper's Watch
+
+- [dangling] "He trimmed the wick every four hours.": "He": no earlier statement names who.
+pass 2 / dangling 1 / outside-frame 0
+
+# 1 The Keeper's Watch - Aside - The log
+
+- [dangling] "Then they read every page.": "they": the note never says who read it.
+pass 1 / dangling 1 / outside-frame 0
+
+=== END READS-ALONE CHECK ===

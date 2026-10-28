@@ -1,85 +1,100 @@
 package repair_test
 
 import (
-	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/corygyarmathy/slipbox/internal/checker"
 	"github.com/corygyarmathy/slipbox/internal/mechcheck"
 	"github.com/corygyarmathy/slipbox/internal/note"
 	"github.com/corygyarmathy/slipbox/internal/repair"
-	"github.com/corygyarmathy/slipbox/internal/run"
 	"github.com/corygyarmathy/slipbox/internal/supportcheck"
 	"github.com/corygyarmathy/slipbox/internal/testfixture"
 )
 
-// The Pragmatism run's support reply for segment 7 gives thirteen flags, then
-// a "Correction to the above" and two more, on statements it flagged already.
-// Six of its fifteen flags count, the rest being reads-alone grades, which
-// step 1.3b governs. The correction's "But in this world…" is the second flag
-// on that statement, and is in its entry, not one of its own.
+// A support report that flags statements, then gives a correction that
+// flags two of them again, quoted differently. Of its seven flags, five
+// count, the rest having the reads-alone grades step 1.3b governs. Each
+// statement is one entry, its flags in the order given, so a correction's
+// flag joins its statement's entry rather than making one of its own.
 func TestStillFails_OneEntryPerStatement(t *testing.T) {
-	trial := testfixture.PragmatismRun(t)
-	notes, err := note.ReadDir(filepath.Join(trial, run.ExtractDir, run.NotesDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	reply := testfixture.Files(t, filepath.Join(trial, run.SupportCheckDir, run.RawDir))["7.txt"]
+	notes := testfixture.LampStage1Notes(t)
+	reply := "# 2 The Lens\n\n" +
+		"- [dangling] \"The lens bends light…\": \"The lens\": named in the last chapter.\n" +
+		"- [weak] \"A beam carries farther than a glow.\": the section says farther, not how far.\n" +
+		"- [outside-frame] \"Obviously, a keeper can take no notice…\": \"Obviously\": as the last chapter showed.\n" +
+		"- [cut lost content] \"On a foggy night it is no help at all.\": the cut drops that the lens is no help.\n" +
+		"- [reworded] \"It uses rings of prisms…\": the source names the Fresnel lens.\n\n" +
+		"Correction to the above, since two entries were reasoning notes rather than faults:\n\n" +
+		"- [weak] \"A beam carries farther…\": the section compares, it does not measure.\n" +
+		"- [cut lost content] \"On a foggy night…\": the cut drops what \"it\" is.\n\n" +
+		"pass 2 / weak 1 / cut lost content 1 / reworded 1\n"
 	flags := withFiles(checker.Parse(reply, supportcheck.Grades).Flags, notes)
-	if len(flags) != 15 {
-		t.Fatalf("%d flags, want 15", len(flags))
+	if len(flags) != 7 {
+		t.Fatalf("%d flags, want 7", len(flags))
 	}
-	entries := repair.StillFails(notes, &mechcheck.Report{}, flags, nil)
-	var got []int
-	for _, e := range entries {
-		if e.Statement == "" || e.File != "7 The True Is the Good in the Way of Belief.md" {
-			t.Errorf("flag %.60q resolves to no statement of its note", e.Quote)
+	got := repair.StillFails(notes, &mechcheck.Report{}, flags, nil)
+	support := func(grade, quote, reason string) repair.Flag {
+		return repair.Flag{Step: repair.StepSupport, Grades: []string{grade}, Quote: quote, Reason: reason}
+	}
+	want := []repair.Entry{
+		{
+			File: lens, Statement: "A beam carries farther than a glow.[^2]",
+			Traces: []string{"[^2]: " + lensTrace("A beam carries farther than a glow.")}, Grades: []string{"weak"},
+			Flags: []repair.Flag{
+				support("weak", "A beam carries farther than a glow.", "the section says farther, not how far."),
+				support("weak", "A beam carries farther…", "the section compares, it does not measure."),
+			},
+		},
+		{
+			File: lens, Statement: "On a foggy night it is no help at all.[^4]",
+			Traces: []string{"[^4]: " + lensTrace("On a foggy night it is no help at all.")}, Grades: []string{"cut lost content"},
+			Flags: []repair.Flag{
+				support("cut lost content", "On a foggy night it is no help at all.", "the cut drops that the lens is no help."),
+				support("cut lost content", "On a foggy night…", `the cut drops what "it" is.`),
+			},
+		},
+		{
+			File: lens, Statement: "It uses rings of prisms instead of one thick glass.[^5]",
+			Traces: []string{"[^5]: " + lensTrace("uses rings of prisms instead of one thick glass")}, Grades: []string{"reworded"},
+			Flags: []repair.Flag{support("reworded", "It uses rings of prisms…", "the source names the Fresnel lens.")},
+		},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("still fails:\n got %+v\nwant %+v", got, want)
+	}
+}
+
+// A quote resolves to the statement it starts, run on into the statements
+// after it on its line. A quote inside a statement resolves to it, unless
+// another statement holds it too: then the flag is listed by its quote.
+func TestStillFails_ResolvingAQuote(t *testing.T) {
+	// runNotes's segment 3 note has two statements on a line.
+	notes := testfixture.LampStage1Notes(t)
+	for i, n := range notes {
+		if n.Name == storms {
+			notes[i] = note.Parse(storms, runNotes[storms])
 		}
-		got = append(got, len(e.Flags))
 	}
-	if want := []int{2, 1, 1, 1, 1}; !reflect.DeepEqual(got, want) {
-		t.Errorf("flags by entry %v, want %v", got, want)
+	dangling := func(h1, quote string) checker.Flag {
+		return checker.Flag{H1: h1, Grades: []checker.Grade{checker.Dangling}, Statement: quote, Reason: "r"}
 	}
-	if len(entries) > 0 && !strings.HasPrefix(entries[0].Statement, "But in this world,[^5] certain ideas") {
-		t.Errorf("first entry %.60q, want the statement flagged twice", entries[0].Statement)
-	}
-}
-
-// A statement flagged twice, quoted differently, once up to a "…" and once
-// whole, is one entry with both flags.
-func TestStillFails_AStatementQuotedTwoWays(t *testing.T) {
-	notes := []*note.Note{note.Parse("1 Two.md", "# 1 Two\n\nGamma is third.[^1] Delta is fourth.[^2]\n\n"+
-		"[^1]: [[Tiny#Two]] \"Gamma is third.\"\n[^2]: [[Tiny#Two]] \"Delta is fourth.\"\n")}
 	flags := withFiles([]checker.Flag{
-		{H1: "1 Two", Grades: []checker.Grade{checker.Dangling}, Statement: "Gamma is…", Reason: "of what"},
-		{H1: "1 Two", Grades: []checker.Grade{checker.Dangling}, Statement: "Gamma is third.", Reason: "third of what"},
+		dangling("3 Storms", "In a storm the light matters most. A wreck was his…"),
+		dangling("2 The Lens", "rings of prisms"),
+		dangling("2 The Lens", "night"),
 	}, notes)
-	entries := repair.StillFails(notes, &mechcheck.Report{}, nil, flags)
-	if len(entries) != 1 || entries[0].Statement != "Gamma is third.[^1]" || len(entries[0].Flags) != 2 {
-		t.Errorf("entries %+v, want one, Gamma's, with both flags", entries)
+	var got []string
+	for _, e := range repair.StillFails(notes, &mechcheck.Report{}, nil, flags) {
+		got = append(got, e.File+": "+e.Statement+e.Quote)
 	}
-}
-
-// A quote inside a statement resolves to it, unless another statement holds
-// it too: then the flag is listed by its quote.
-func TestStillFails_AFragmentResolvesOnlyWhenOneStatementHoldsIt(t *testing.T) {
-	notes := []*note.Note{note.Parse("1 Two.md", "# 1 Two\n\nGamma is third.[^1] Delta is fourth.[^2]\n\n"+
-		"[^1]: [[Tiny#Two]] \"Gamma is third.\"\n[^2]: [[Tiny#Two]] \"Delta is fourth.\"\n")}
-	flags := withFiles([]checker.Flag{
-		{H1: "1 Two", Grades: []checker.Grade{checker.Dangling}, Statement: "third", Reason: "third of what"},
-		{H1: "1 Two", Grades: []checker.Grade{checker.Dangling}, Statement: "is", Reason: "is what"},
-	}, notes)
-	entries := repair.StillFails(notes, &mechcheck.Report{}, nil, flags)
-	if len(entries) != 2 {
-		t.Fatalf("%d entries, want 2: %+v", len(entries), entries)
+	want := []string{
+		lens + ": It uses rings of prisms instead of one thick glass.[^5]",
+		lens + ": night",
+		storms + ": In a storm the light matters most.[^1]",
 	}
-	if e := entries[0]; e.Statement != "Gamma is third.[^1]" {
-		t.Errorf("first entry %+v, want it resolved to Gamma's statement", e)
-	}
-	if e := entries[1]; e.Statement != "" || e.Quote != "is" {
-		t.Errorf("second entry %+v, want it listed by its quote", e)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("entries by file and statement, or quote:\n got %q\nwant %q", got, want)
 	}
 }
 

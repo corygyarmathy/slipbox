@@ -1,0 +1,32 @@
+=== YOUR SEGMENT'S NOTES (segment 0: 2. Keepers of the Lamp) ===
+--- NOTE: 0 Keepers of the Lamp ---
+# 0 Keepers of the Lamp
+
+A lighthouse is a promise made to ships. It burns whether or not a ship is near.[^1][^2]
+The keeper kept that promise for the harbour.[^3]
+
+[^1]: [[Lighthouses - Ch 2 - Keepers of the Lamp#2. Keepers of the Lamp]] "A lighthouse is a promise made to ships."
+[^2]: [[Lighthouses - Ch 2 - Keepers of the Lamp#2. Keepers of the Lamp]] "It burns whether or not a ship is near."
+[^3]: [[Lighthouses - Ch 2 - Keepers of the Lamp#2. Keepers of the Lamp]] "The keeper kept that promise for the harbour."
+
+=== END YOUR SEGMENT'S NOTES (segment 0: 2. Keepers of the Lamp) ===
+
+=== MECHANICAL CHECK ===
+### 0 Keepers of the Lamp.md
+=== END MECHANICAL CHECK ===
+
+=== SUPPORT AND CUTS CHECK ===
+# 0 Keepers of the Lamp
+
+- [dangling] "It burns whether or not a ship is near.": "It": the lighthouse, named in the statement before.
+- [outside-frame] "The keeper kept that promise…": "The keeper": the keeper the last chapter introduced.
+pass 1 / dangling 1 / outside-frame 1
+
+=== END SUPPORT AND CUTS CHECK ===
+
+=== READS-ALONE CHECK ===
+# 0 Keepers of the Lamp
+
+pass 3 / dangling 0 / outside-frame 0
+
+=== END READS-ALONE CHECK ===

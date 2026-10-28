@@ -1,0 +1,31 @@
+=== YOUR SEGMENT'S NOTES (segment 3: Storms) ===
+--- NOTE: 3 Storms ---
+# 3 Storms
+
+In a storm the light matters most.[^1] A wreck was his failure, whatever the weather.[^2]
+He stayed at the lamp (in 1839, for nine days) through every gale.[^3]
+
+[^1]: [[Lighthouses - Ch 2 - Keepers of the Lamp#Storms]] "In a calm the sea is kind."
+[^2]: [[Lighthouses - Ch 2 - Keepers of the Lamp#Storms]] "failure, whatever the weather"
+[^3]: [[Lighthouses - Ch 2 - Keepers of the Lamp#Storms]] "stayed at the lamp (in 1839, for nine days) through every gale"
+
+=== END YOUR SEGMENT'S NOTES (segment 3: Storms) ===
+
+=== MECHANICAL CHECK ===
+### 3 Storms.md
+  BROKEN [^1] In a calm the sea is kind.
+=== END MECHANICAL CHECK ===
+
+=== SUPPORT AND CUTS CHECK ===
+# 3 Storms
+
+pass 3
+
+=== END SUPPORT AND CUTS CHECK ===
+
+=== READS-ALONE CHECK ===
+# 3 Storms
+
+pass 3 / dangling 0 / outside-frame 0
+
+=== END READS-ALONE CHECK ===
