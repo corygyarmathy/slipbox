@@ -99,9 +99,9 @@ func TestRun(t *testing.T) {
 }
 
 const (
-	keepers = "0 Keepers of the Lamp"
-	lens    = "2 The Lens"
-	extra   = "4 Extra"
+	keepersDir = "0 Keepers of the Lamp"
+	lensDir    = "2 The Lens"
+	extraDir   = "4 Extra"
 )
 
 // Notes named twice in the run, ignoring case, stay in their segment
@@ -112,8 +112,8 @@ const (
 // one is named like a staged note but hidden in a dot folder.
 func TestRun_ListsNameClashes(t *testing.T) {
 	added := map[string]string{
-		extra + "/Rings of Prisms.md":     "# Rings of Prisms\n\nA note named as another segment's is.\n",
-		extra + "/KEEPERS OF THE LAMP.md": "# KEEPERS OF THE LAMP\n\nA note named as a hub is, in another case.\n",
+		extraDir + "/Rings of Prisms.md":     "# Rings of Prisms\n\nA note named as another segment's is.\n",
+		extraDir + "/KEEPERS OF THE LAMP.md": "# KEEPERS OF THE LAMP\n\nA note named as a hub is, in another case.\n",
 	}
 	folder, src, notes := lampFormatted(t, added)
 	v := vault(t, "rings of prisms.md", "Sub/THE LENS MAKES A BEAM.md", "Unrelated.md", ".hidden/Storms.md", "Storms.png")
@@ -128,8 +128,8 @@ func TestRun_ListsNameClashes(t *testing.T) {
 	delete(got, ClashListFile)
 	delete(got, RunReportFile)
 	want := staged(t, notes,
-		keepers+"/Keepers of the Lamp.md", extra+"/KEEPERS OF THE LAMP.md",
-		lens+"/Rings of Prisms.md", extra+"/Rings of Prisms.md")
+		keepersDir+"/Keepers of the Lamp.md", extraDir+"/KEEPERS OF THE LAMP.md",
+		lensDir+"/Rings of Prisms.md", extraDir+"/Rings of Prisms.md")
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("staged %q, want %q: every note flat as it came but the four named twice, each in its segment folder", slices.Sorted(maps.Keys(got)), slices.Sorted(maps.Keys(want)))
 	}
@@ -147,8 +147,10 @@ func TestRun_ListsNameClashes(t *testing.T) {
 	}
 }
 
-// ReadSlipBox lists the .md files under _Slip_Box, nested ones too, in byte
-// order, and skips a file or folder whose name starts with a dot.
+// ReadSlipBox lists the .md files under _Slip_Box, nested ones too, and
+// skips a file or folder whose name starts with a dot. These names come in
+// the same order whether sorted by byte or walked, so this doesn't check the
+// byte order ReadSlipBox's doc promises.
 func TestReadSlipBox(t *testing.T) {
 	v := vault(t, "b.md", "Sub/a.md", "A.md", "Storms.png", ".Hidden.md", ".hidden/Storms.md")
 	if err := os.Mkdir(filepath.Join(v, SlipBoxDir, "Folder.md"), 0o755); err != nil {
@@ -231,17 +233,10 @@ func TestRun_AStagingFolderInTheRunFolderStops(t *testing.T) {
 }
 
 func TestRun_ANoteNamedLikeTheClashListOrTheRunReportIsHeld(t *testing.T) {
-	folder, src, _ := lampFormatted(t, nil)
-	seg := filepath.Join(folder.Dir, filepath.FromSlash(run.FormattedOrFallbackNotes), extra)
-	if err := os.MkdirAll(seg, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(seg, "Name-Clashes.md"), []byte("# Name-Clashes\n\nA note of the source.\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(seg, "Run-Report.md"), []byte("# Run-Report\n\nA note of the source.\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	folder, src, _ := lampFormatted(t, map[string]string{
+		extraDir + "/Name-Clashes.md": "# Name-Clashes\n\nA note of the source.\n",
+		extraDir + "/Run-Report.md":   "# Run-Report\n\nA note of the source.\n",
+	})
 	v := vault(t)
 	staging := DefaultStaging(v, src.Name)
 	if err := Run(src, folder, v, staging); err != nil {
@@ -251,17 +246,17 @@ func TestRun_ANoteNamedLikeTheClashListOrTheRunReportIsHeld(t *testing.T) {
 	if !strings.HasPrefix(got[ClashListFile], "# Name clashes\n") {
 		t.Errorf("staged %s is not the clash list:\n%s", ClashListFile, got[ClashListFile])
 	}
-	if got[extra+"/Name-Clashes.md"] != "# Name-Clashes\n\nA note of the source.\n" {
-		t.Errorf("the note named like the clash list is not held in its segment folder: %q", got[extra+"/Name-Clashes.md"])
+	if got[extraDir+"/Name-Clashes.md"] != "# Name-Clashes\n\nA note of the source.\n" {
+		t.Errorf("the note named like the clash list is not held in its segment folder: %q", got[extraDir+"/Name-Clashes.md"])
 	}
-	if want := "- [[Staging/" + src.Name + "/name-clashes|name-clashes.md]], [[Staging/" + src.Name + "/" + extra + "/Name-Clashes|" + extra + "/Name-Clashes.md]]\n"; !strings.Contains(got[ClashListFile], want) {
+	if want := "- [[Staging/" + src.Name + "/name-clashes|name-clashes.md]], [[Staging/" + src.Name + "/" + extraDir + "/Name-Clashes|" + extraDir + "/Name-Clashes.md]]\n"; !strings.Contains(got[ClashListFile], want) {
 		t.Errorf("the clash list has no line %q:\n%s", want, got[ClashListFile])
 	}
 	// The run report's name is held the same way.
-	if got[RunReportFile] != stagedReport || got[extra+"/Run-Report.md"] == "" {
+	if got[RunReportFile] != stagedReport || got[extraDir+"/Run-Report.md"] == "" {
 		t.Errorf("the run report or the note named like it is not where it belongs")
 	}
-	if want := "- [[Staging/" + src.Name + "/run-report|run-report.md]], [[Staging/" + src.Name + "/" + extra + "/Run-Report|" + extra + "/Run-Report.md]]\n"; !strings.Contains(got[ClashListFile], want) {
+	if want := "- [[Staging/" + src.Name + "/run-report|run-report.md]], [[Staging/" + src.Name + "/" + extraDir + "/Run-Report|" + extraDir + "/Run-Report.md]]\n"; !strings.Contains(got[ClashListFile], want) {
 		t.Errorf("the clash list has no line %q:\n%s", want, got[ClashListFile])
 	}
 }
