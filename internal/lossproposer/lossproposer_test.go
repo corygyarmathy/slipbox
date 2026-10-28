@@ -352,12 +352,16 @@ func TestRun(t *testing.T) {
 }
 
 // Run on another model asks for it in both runs' calls, and each line of
-// the usage log records it, with its run.
+// the usage log records it, with its run. The union doesn't change: one
+// entry per called segment.
 func TestRun_AnotherModel(t *testing.T) {
 	src, folder := repairedRun(t)
 	p := serveCases(t, src, replyCases)
 	if err := lossproposer.Run(context.Background(), p, src, "opus", folder); err != nil {
 		t.Fatal(err)
+	}
+	if segs := readLosses(t, folder); len(segs) != len(replyCases) {
+		t.Errorf("proposed losses for %d segments, want %d: %+v", len(segs), len(replyCases), segs)
 	}
 	calls := p.Calls()
 	for _, c := range calls {
@@ -386,6 +390,20 @@ func TestRun_AnotherModel(t *testing.T) {
 	}
 	if want := map[int]int{1: len(replyCases), 2: len(replyCases)}; !reflect.DeepEqual(runs, want) {
 		t.Errorf("usage lines by run = %v, want %v", runs, want)
+	}
+}
+
+// A step with no remark still writes its dropped list, empty, so the
+// complete step says it dropped nothing.
+func TestRun_NoRemarkWritesAnEmptyDroppedList(t *testing.T) {
+	src, folder := repairedRun(t)
+	p := serve(t, src, func(n, k int) (string, error) { return "No losses proposed.", nil })
+	if err := lossproposer.Run(context.Background(), p, src, lossproposer.Model, folder); err != nil {
+		t.Fatal(err)
+	}
+	files := testfixture.Files(t, filepath.Join(folder.Dir, run.LossProposerDir))
+	if got, ok := files[run.DroppedFile]; !ok || got != "[]\n" {
+		t.Errorf("%s = %q (present %v), want \"[]\\n\"", run.DroppedFile, got, ok)
 	}
 }
 
