@@ -42,17 +42,20 @@ func TestPrompt(t *testing.T) {
 
 // replyCase is a segment's reply and the flags Run should parse from it.
 type replyCase struct {
+	name    string
 	segment int
 	reply   string
 	want    checker.Report
 }
 
 // replyCases are one reply per segment of the invented chapter, each
-// covering a shape of report the step handles.
+// covering a shape of report the step handles. Run makes one call per
+// segment, so a case that covers several deviations gives them in one
+// reply, and its name says which.
 var replyCases = []replyCase{
 	// A well-formed report: flags under the note's H1, each given the note's
 	// file, and the counts line kept under it.
-	{0, "# 0 Keepers of the Lamp\n\n" +
+	{"well-formed, reworded graded", 0, "# 0 Keepers of the Lamp\n\n" +
 		"- [weak] \"It burns whether or not a ship is near.\": the section says it burns, not that it burns for no ship.\n" +
 		"- [reworded] \"The keeper kept that promise…\": the quote reads \"for the harbour\", which the statement moves.\n" +
 		"pass 1 / weak 1 / fail 0 / dangling 0 / outside-frame 0\n",
@@ -67,13 +70,16 @@ var replyCases = []replyCase{
 		}},
 	// Two statements graded on one line give a flag each. A flag under the
 	// aside's H1 is given the aside's file. An H1 that names none of the
-	// segment's notes, here for a dropped apostrophe, gives its flag no file.
-	{1, "# 1 The Keeper's Watch\n\n" +
+	// segment's notes gives its flag no file: here one with a dropped
+	// apostrophe, and one naming another segment's note.
+	{"two statements on a line, aside, H1 of no note of the segment", 1, "# 1 The Keeper's Watch\n\n" +
 		"- [dangling] \"He trimmed the wick…\" / \"He logged the weather…\": \"He\" has no antecedent in the note.\n\n" +
 		"# 1 The Keeper's Watch - Aside - The log\n\n" +
 		"- [dangling] \"Then they read every page.\": \"they\" has no antecedent in the note.\n\n" +
 		"# 1 The Keepers Watch\n\n" +
-		"- [cut would do] \"The watch began at dusk.\": the whole sentence is quoted where \"at dusk\" would do.\n",
+		"- [cut would do] \"The watch began at dusk.\": the whole sentence is quoted where \"at dusk\" would do.\n\n" +
+		"# 2 The Lens\n\n" +
+		"- [weak] \"Each ring bends the light…\": the section gives no rings.\n",
 		checker.Report{
 			Flags: []checker.Flag{
 				{H1: "1 The Keeper's Watch", File: "1 The Keeper's Watch.md", Grades: []checker.Grade{checker.Dangling},
@@ -84,13 +90,15 @@ var replyCases = []replyCase{
 					Statement: "Then they read every page.", Reason: `"they" has no antecedent in the note.`},
 				{H1: "1 The Keepers Watch", File: "", Grades: []checker.Grade{checker.CutWouldDo},
 					Statement: "The watch began at dusk.", Reason: `the whole sentence is quoted where "at dusk" would do.`},
+				{H1: "2 The Lens", File: "", Grades: []checker.Grade{checker.Weak},
+					Statement: "Each ring bends the light…", Reason: "the section gives no rings."},
 			},
 			Other: []checker.Line{},
 		}},
 	// A report that flags statements, then withdraws the flags. They stand:
 	// a report's withdrawals are the repair call's to read, and the
 	// withdrawal is kept as text.
-	{2, "# 2 The Lens\n\n" +
+	{"withdrawn flags stand", 2, "# 2 The Lens\n\n" +
 		"- [fail] \"Obviously, a keeper can take no notice…\": the section says nothing of the keeper.\n" +
 		"- [outside-frame] \"It uses rings of prisms…\": \"It\" is the Fresnel lens, which only the source names.\n\n" +
 		"Correcting the above: both pass. The first quotes the section word for word, and \"It\" is the lens the note names.\n" +
@@ -108,7 +116,7 @@ var replyCases = []replyCase{
 			},
 		}},
 	// A report with no flag: its flags are an empty list.
-	{3, "# 3 Storms\n\npass 3 / weak 0 / fail 0 / dangling 0 / outside-frame 0\n",
+	{"no flag", 3, "# 3 Storms\n\npass 3 / weak 0 / fail 0 / dangling 0 / outside-frame 0\n",
 		checker.Report{
 			Flags: []checker.Flag{},
 			Other: []checker.Line{{H1: "3 Storms", Text: "pass 3 / weak 0 / fail 0 / dangling 0 / outside-frame 0"}},
@@ -147,25 +155,27 @@ func TestRun(t *testing.T) {
 
 	dir := filepath.Join(folder.Dir, run.SupportCheckDir)
 	for _, c := range replyCases {
-		n := strconv.Itoa(c.segment)
-		report, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(path.Join(run.ReportsDir, n+".md"))))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if string(report) != c.reply {
-			t.Errorf("segment %d: report is not the reply:\n got %q\nwant %q", c.segment, report, c.reply)
-		}
-		b, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(path.Join(run.FlagsDir, n+".json"))))
-		if err != nil {
-			t.Fatal(err)
-		}
-		var got checker.Report
-		if err := json.Unmarshal(b, &got); err != nil {
-			t.Fatalf("segment %d: flags: %v", c.segment, err)
-		}
-		if !reflect.DeepEqual(got, c.want) {
-			t.Errorf("segment %d: flags:\n got %+v\nwant %+v", c.segment, got, c.want)
-		}
+		t.Run(c.name, func(t *testing.T) {
+			n := strconv.Itoa(c.segment)
+			report, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(path.Join(run.ReportsDir, n+".md"))))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(report) != c.reply {
+				t.Errorf("segment %d: report is not the reply:\n got %q\nwant %q", c.segment, report, c.reply)
+			}
+			b, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(path.Join(run.FlagsDir, n+".json"))))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got checker.Report
+			if err := json.Unmarshal(b, &got); err != nil {
+				t.Fatalf("segment %d: flags: %v", c.segment, err)
+			}
+			if !reflect.DeepEqual(got, c.want) {
+				t.Errorf("segment %d: flags:\n got %+v\nwant %+v", c.segment, got, c.want)
+			}
+		})
 	}
 
 	notes := testfixture.LampStage1Notes(t)
