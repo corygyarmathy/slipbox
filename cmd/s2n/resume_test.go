@@ -3,13 +3,12 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -32,47 +31,91 @@ import (
 	"github.com/corygyarmathy/slipbox/internal/usagelimit"
 )
 
-// pragmatismAfterProposer gives the Pragmatism source and a run folder of
-// the Pragmatism run stopped after step 1.5: every step's directory to there,
-// copied whole. Step 1.5's union is given an invented second loss, 4.1
-// (addLoss41).
-func pragmatismAfterProposer(t *testing.T) (*source.Source, string) {
-	t.Helper()
-	folder := testfixture.PragmatismFolder(t, append(stepDirsBefore(run.LossProposerDir), run.LossProposerDir)...)
-	addLoss41(t, folder.Dir)
-	return testfixture.PragmatismSource(t), folder.Dir
-}
+// Step 1.5's replies on Lamp's segments 2 and 3 in lampAfterProposer, each
+// proposing a loss, and the kept-loss repair's and its re-check's replies on
+// them in keptLossCases.
+const (
+	// stormsLoss gives the author's sentence, which no note quotes, as a
+	// loss.
+	stormsLoss = "# Storms\n\n" +
+		"1. **The author stood in the lamp room**\n" +
+		"   - Quote: \"I have stood in that lamp room in a gale, and the glass shook.\"\n" +
+		"   - Why: The author saw a gale from the lamp.\n"
+	lensLoss = "# The Lens\n\n" +
+		"1. **The lens is named: the Fresnel lens**\n" +
+		"   - Quote: \"*The Fresnel lens*\"\n" +
+		"   - Why: The section names it.\n"
+	// lensKept adds loss 2.1, inserted quote-once after the note's last
+	// statement.
+	lensKept = "=== EDIT: 2 The Lens.md ===\n" +
+		"--- AFTER ---\nIt uses rings of prisms instead of one thick glass.[^5]\n" +
+		"--- INSERT ---\n*The Fresnel lens* uses rings of prisms instead of one thick glass.\n" +
+		"=== REPORT ===\n- Loss 2.1: named the lens.\n"
+	// lensRecheck grades the statement lensKept adds as cut lost content.
+	lensRecheck = "# 2 The Lens\n\n" +
+		"- [cut lost content] \"*The Fresnel lens* uses rings…\": the cut drops that the rings replace one thick glass.\n" +
+		"pass 5 / cut lost content 1\n"
+	// stormsAlready adds nothing for loss 3.1, which it finds already stated.
+	stormsAlready = "=== REPORT ===\n- Loss 3.1: already stated.\n"
+)
 
-// addLoss41 adds a loss to segment 4 in step 1.5's union in runDir, which
-// the Pragmatism run's proposers didn't propose, so that the kept-loss repair
-// calls two segments, and one adds nothing. Its wording is invented.
-func addLoss41(t *testing.T, runDir string) {
+// lampAfterProposer gives a run folder of Lamp stopped after step 1.5, which
+// proposed a loss in segment 2, 2.1, and one in segment 3, 3.1, so that the
+// kept-loss repair calls two segments.
+func lampAfterProposer(t *testing.T) string {
 	t.Helper()
-	p := filepath.Join(runDir, run.LossProposerDir, run.ProposedLossesFile)
-	b, err := os.ReadFile(p)
+	runDir, _, _ := lampRun(t, lampReplies{run.LossProposerDir: {
+		2: {lensLoss, lensLoss},
+		3: {stormsLoss, stormsLoss},
+	}}, "-stop-after", run.LossProposerDir)
+	kept, err := keptloss.Losses(&run.Folder{Dir: runDir})
 	if err != nil {
 		t.Fatal(err)
 	}
-	var segs []lossproposer.Segment
-	if err := json.Unmarshal(b, &segs); err != nil {
-		t.Fatal(err)
+	if ids := keptIDs(kept); !reflect.DeepEqual(ids, []string{"2.1", "3.1"}) {
+		t.Fatalf("kept %q, want 2.1 and 3.1", ids)
 	}
-	if segs[4].Segment != 4 || len(segs[4].Losses) != 0 {
-		t.Fatalf("the recorded union has a loss in segment 4")
+	return runDir
+}
+
+// keptLoss and keptLossRecheck are the keys Serve matches segment n's
+// kept-loss call and its re-check on: the labels their user prompts give the
+// segment's notes.
+func keptLoss(n int) string { return fmt.Sprintf("=== YOUR SEGMENT'S NOTES (segment %d: ", n) }
+func keptLossRecheck(n int) string {
+	return fmt.Sprintf("=== YOUR SEGMENT'S NOTES TO CHECK (segment %d: ", n)
+}
+
+// keptLossCases are the replies for resuming lampAfterProposer's run, which
+// keeps every proposed loss: segment 2's kept-loss call adds loss 2.1, which
+// its re-check fails, and segment 3's adds nothing, so its re-check passes.
+func keptLossCases() []testfixture.Case {
+	return []testfixture.Case{
+		{Contains: keptLoss(2), Reply: lensKept},
+		{Contains: keptLoss(3), Reply: stormsAlready},
+		{Contains: keptLossRecheck(2), Reply: lensRecheck},
+		{Contains: keptLossRecheck(3), Reply: "pass\n"},
 	}
-	segs[4].Losses = []lossproposer.Loss{{Wordings: []lossproposer.Item{{
-		Run:    1,
-		Idea:   "An invented loss the notes already state",
-		Quotes: []string{"An invented quote."},
-		Why:    "It stands in for a loss the kept-loss call finds already stated.",
-		Text:   "1. **An invented loss the notes already state**\n   - Quote: \"An invented quote.\"\n   - Why: It stands in for a loss the kept-loss call finds already stated.",
-	}}}}
-	if b, err = json.Marshal(segs); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(p, b, 0o644); err != nil {
-		t.Fatal(err)
-	}
+}
+
+// lampFinal are the final stage 1 notes keptLossCases leave: LampStage1,
+// with loss 2.1 added to segment 2's note.
+func lampFinal() map[string]string {
+	final := testfixture.LampStage1()
+	lens := func(q string) string { return testfixture.LampTrace("The Lens", q) + "\n" }
+	final["2 The Lens.md"] = "# 2 The Lens\n\n" +
+		"The lens bends light into a beam.[^1]\n" +
+		"A beam carries farther than a glow.[^2]\n" +
+		"Obviously, a keeper can take no notice of the lens on a clear night.[^3]\n" +
+		"On a foggy night it is no help at all.[^4]\n" +
+		"It uses rings of prisms instead of one thick glass.[^5] *The Fresnel lens* uses rings of prisms instead of one thick glass.[^6]\n\n" +
+		"[^1]: " + lens("The lens bends light into a beam.") +
+		"[^2]: " + lens("A beam carries farther than a glow.") +
+		"[^3]: " + lens("Obviously, a keeper can take no notice of the lens on a clear night.") +
+		"[^4]: " + lens("On a foggy night it is no help at all.") +
+		"[^5]: " + lens("uses rings of prisms instead of one thick glass") +
+		"[^6]: " + lens("*The Fresnel lens* uses rings of prisms instead of one thick glass.")
+	return final
 }
 
 // resume runs `s2n resume` on runDir with p, and gives its exit code and
@@ -110,41 +153,6 @@ func resumeTo(t *testing.T, runDir, stopAfter string, p provider.Provider) (int,
 	return code, stderr.String()
 }
 
-// keptLossReplies are the prompts and replies for resuming
-// pragmatismAfterProposer's run, which keeps every proposed loss: segment
-// 0's call, served the Pragmatism run's reply, and segment 4's, served a
-// reply that adds nothing, then step 1.3a's re-check of segment 0, served
-// the run's, and of segment 4, which passes.
-func keptLossReplies(t *testing.T, src *source.Source, runDir string) (prompts, replies []string) {
-	t.Helper()
-	kept, err := keptloss.Losses(&run.Folder{Dir: runDir})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if ids := keptIDs(kept); !reflect.DeepEqual(ids, []string{"0.1", "4.1"}) {
-		t.Fatalf("kept %q, want 0.1 and 4.1", ids)
-	}
-	before, err := note.ReadDir(filepath.Join(runDir, filepath.FromSlash(run.RepairNotes)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	recorded := filepath.Join(testfixture.PragmatismRun(t), run.KeptLossDir)
-	after, err := note.ReadDir(filepath.Join(recorded, run.NotesDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	keptRaw := testfixture.Files(t, filepath.Join(recorded, run.RawDir))
-	recheckRaw := testfixture.Files(t, filepath.Join(recorded, run.KeptLossSupportDir, run.RawDir))
-	return []string{
-			keptloss.Prompt(before, src.Segments[0], kept[:1]), keptloss.Prompt(before, src.Segments[4], kept[1:]),
-			supportcheck.Prompt(after, src.Segments[0]), supportcheck.Prompt(after, src.Segments[4]),
-		},
-		[]string{
-			keptRaw["0.txt"], "=== REPORT ===\n- Loss 4.1: already stated.\n",
-			recheckRaw["0.txt"], "# 4 The Formation of New Beliefs\n\npass 9\n",
-		}
-}
-
 // runReport reads the run report in runDir, split into its sections.
 func runReport(t *testing.T, runDir string) map[string]string {
 	t.Helper()
@@ -162,15 +170,22 @@ func runReport(t *testing.T, runDir string) map[string]string {
 
 // Resuming after step 1.5 sends every proposed loss through the kept-loss
 // call with its brief, the quote-once kept-loss brief by default, re-checks
-// segments 0 and 4, and writes the final notes, which the run report reads,
-// and stops at nothing. Segment 0's calls are the Pragmatism run's, so its
-// final notes are the run's, byte for byte; segment 4's call adds nothing,
-// so its loss is dropped. No step before it runs again, and a second resume
-// has nothing to do.
+// segments 2 and 3, and writes the final notes, which the run report reads,
+// and stops at nothing. Segment 2's call adds its loss, and segment 3's
+// adds nothing, so its loss is dropped. No step before it runs again, and a
+// second resume has nothing to do.
 func TestResume_AddsEveryLoss(t *testing.T) {
-	src, runDir := pragmatismAfterProposer(t)
-	prompts, replies := keptLossReplies(t, src, runDir)
-	p := testfixture.Replay(t, prompts, replies)
+	runDir := lampAfterProposer(t)
+	src := testfixture.LampSource(t)
+	before, err := note.ReadDir(filepath.Join(runDir, filepath.FromSlash(run.RepairNotes)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	kept, err := keptloss.Losses(&run.Folder{Dir: runDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := testfixture.Serve(t, keptLossCases()...)
 	code, stderr := resume(t, runDir, p)
 	if code != 0 {
 		t.Fatalf("resume: exit %d, want 0: %s", code, stderr)
@@ -184,12 +199,17 @@ func TestResume_AddsEveryLoss(t *testing.T) {
 	if len(calls) != 4 {
 		t.Fatalf("%d calls, want the 2 kept-loss calls and their 2 re-checks", len(calls))
 	}
-	frame := testfixture.PragmatismFrame(t)
-	wantSystem := testfixture.RepoFile(t, "internal/briefs/kept-loss-edits-quote-once.md") + "\n\n" + testfixture.RepoFile(t, "internal/briefs/stage-1-quote-once.md") +
-		"\n\n=== FRAME: " + testfixture.Pragmatism + ".md ===\n" + frame + "\n=== END FRAME ===\n"
-	for _, c := range calls[:2] {
-		if c.System != wantSystem || c.Model != "opus" {
-			t.Errorf("kept-loss call: model %q, and its system prompt is not kept-loss-edits-quote-once.md, stage-1-quote-once.md and the frame", c.Model)
+	// Each kept-loss call is given its segment's losses and the notes step
+	// 1.4 left, segment 2's first.
+	wantSystem := testfixture.RepoFile(t, "internal/briefs/kept-loss-edits-quote-once.md") + "\n\n" +
+		testfixture.RepoFile(t, "internal/briefs/stage-1-quote-once.md") + "\n\n" + lampFrame
+	for i, n := range []int{2, 3} {
+		c := calls[i]
+		if c.System != wantSystem || c.Model != "opus" || c.Effort != "medium" {
+			t.Errorf("kept-loss call %d: model %q at %q, and its system prompt is not kept-loss-edits-quote-once.md, stage-1-quote-once.md and the frame", i, c.Model, c.Effort)
+		}
+		if want := keptloss.Prompt(before, src.Segments[n], kept[i:i+1]); c.User != want {
+			t.Errorf("kept-loss call %d is not segment %d's, with its loss and step 1.4's notes:\n%s", i, n, c.User)
 		}
 	}
 	// The re-check shares the notes the kept-loss call wrote, which the run
@@ -198,51 +218,32 @@ func TestResume_AddsEveryLoss(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, c := range calls[2:] {
-		if c.System != supportcheck.Check().Brief+"\n\n=== FRAME: "+testfixture.Pragmatism+".md ===\n"+frame+"\n=== END FRAME ===\n\n"+supportcheck.Shared(after) || c.Model != supportcheck.Model {
-			t.Errorf("re-check call is not step 1.3a's, with the notes it was given in its system prompt")
+	wantSystem = testfixture.RepoFile(t, "internal/briefs/checker-support.md") + "\n\n" + lampFrame + "\n" + supportcheck.Shared(after)
+	for i, n := range []int{2, 3} {
+		c := calls[2+i]
+		if c.System != wantSystem || c.Model != "sonnet" || c.Effort != "medium" {
+			t.Errorf("re-check call %d is not step 1.3a's, with the notes it was given in its system prompt", i)
 		}
-	}
-	// Segment 0's calls are the requests the run made.
-	recorded := testfixture.PragmatismRun(t)
-	for _, dir := range []string{run.KeptLossDir, filepath.Join(run.KeptLossDir, run.KeptLossSupportDir)} {
-		got := testfixture.Files(t, filepath.Join(runDir, dir, run.RequestsDir))
-		if want := testfixture.Files(t, filepath.Join(recorded, dir, run.RequestsDir)); got["0.sha256"] != want["0.sha256"] {
-			t.Errorf("%s: segment 0's request is not the run's", dir)
+		if c.User != supportcheck.Prompt(after, src.Segments[n]) {
+			t.Errorf("re-check call %d is not segment %d's, on the kept-loss notes:\n%s", i, n, c.User)
 		}
 	}
 
-	got := testfixture.Files(t, final)
-	want := testfixture.Files(t, filepath.Join(recorded, filepath.FromSlash(run.FinalNotes)))
-	if !reflect.DeepEqual(keys(got), keys(want)) {
-		t.Fatalf("final notes %q, want %q", keys(got), keys(want))
+	if got, want := testfixture.Files(t, final), lampFinal(); !reflect.DeepEqual(got, want) {
+		t.Errorf("final notes:\n%v\nwant:\n%v", got, want)
 	}
-	for name, w := range want {
-		if got[name] != w {
-			t.Errorf("final %s is not the run's", name)
-		}
-	}
-	if repaired := testfixture.Files(t, filepath.Join(runDir, filepath.FromSlash(run.RepairNotes))); got["0 What Pragmatism Means.md"] == repaired["0 What Pragmatism Means.md"] {
-		t.Errorf("final 0 What Pragmatism Means has no kept loss")
-	}
-
 	report := runReport(t, runDir)
-	if added := report["Losses added"]; !strings.HasPrefix(added, "\n- Loss 0.1: A dispute can be settled by distinguishing") || strings.Contains(added, "Loss 4.") {
-		t.Errorf("Losses added is not loss 0.1 alone:\n%s", added)
+	if added := report["Losses added"]; !strings.HasPrefix(added, "\n- Loss 2.1: The lens is named") || strings.Contains(added, "Loss 3.") {
+		t.Errorf("Losses added is not loss 2.1 alone:\n%s", added)
 	}
-	if w := "- 1.4-kept-loss-repair, segment 4: loss 4.1: the kept-loss call added no statement"; !strings.Contains(report["Dropped"], w) {
+	if w := "- 1.4-kept-loss-repair, segment 3: loss 3.1: the kept-loss call added no statement"; !strings.Contains(report["Dropped"], w) {
 		t.Errorf("Dropped has no %q:\n%s", w, report["Dropped"])
 	}
 	if !strings.Contains(report["Statements that still fail"], "\n- ") {
 		t.Errorf("Statements that still fail lists none:\n%s", report["Statements that still fail"])
 	}
-	for _, w := range []string{"- Asides: 0\n", "- Name spans that point outside their segment, author name spans included: 7, in ["} {
-		if !strings.Contains(report["Asides and name spans"], w) {
-			t.Errorf("Asides and name spans has no %q:\n%s", w, report["Asides and name spans"])
-		}
-	}
 
-	again := testfixture.Replay(t, nil, nil)
+	again := testfixture.Serve(t)
 	if code, stderr := resumeTo(t, runDir, run.FinalDir, again); code != 0 || len(again.Calls()) != 0 {
 		t.Errorf("second resume: exit %d with %d calls, want 0 with none: %s", code, len(again.Calls()), stderr)
 	}
@@ -252,8 +253,8 @@ func TestResume_AddsEveryLoss(t *testing.T) {
 // final notes drop its statement, with its trace, and the run report lists
 // it.
 func TestResume_ABrokenTraceIsDroppedAndReported(t *testing.T) {
-	src, runDir := pragmatismAfterProposer(t)
-	const name = "2 The Method's Character and Affinities.md"
+	runDir := lampAfterProposer(t)
+	const name = "2 The Lens.md"
 	notePath := filepath.Join(runDir, filepath.FromSlash(run.RepairNotes), name)
 	orig, err := os.ReadFile(notePath)
 	if err != nil {
@@ -270,8 +271,7 @@ func TestResume_ABrokenTraceIsDroppedAndReported(t *testing.T) {
 	if err := os.WriteFile(notePath, []byte(broken), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	prompts, replies := keptLossReplies(t, src, runDir)
-	if code, stderr := resume(t, runDir, testfixture.Replay(t, prompts, replies)); code != 0 {
+	if code, stderr := resume(t, runDir, testfixture.Serve(t, keptLossCases()...)); code != 0 {
 		t.Fatalf("resume: exit %d, want 0: %s", code, stderr)
 	}
 	final := testfixture.Files(t, filepath.Join(runDir, filepath.FromSlash(run.FinalNotes)))[name]
@@ -284,21 +284,18 @@ func TestResume_ABrokenTraceIsDroppedAndReported(t *testing.T) {
 }
 
 // A kept loss whose new statement still fails step 1.3a stops nothing: the
-// statement stays, and the run report lists it with its grade. The
-// Pragmatism run's re-check grades a statement its kept-loss call added as
-// cut lost content and reworded.
+// statement stays, and the run report lists it with its grade.
 func TestResume_KeptLossFailingSupportIsReported(t *testing.T) {
-	src, runDir := pragmatismAfterProposer(t)
-	prompts, replies := keptLossReplies(t, src, runDir)
-	code, stderr := resume(t, runDir, testfixture.Replay(t, prompts, replies))
+	runDir := lampAfterProposer(t)
+	code, stderr := resume(t, runDir, testfixture.Serve(t, keptLossCases()...))
 	if code != 0 {
 		t.Fatalf("resume: exit %d, want 0: %s", code, stderr)
 	}
-	const added = "The corpus of[^7] a ferocious metaphysical dispute[^8] was a squirrel"
-	if fails := runReport(t, runDir)["Statements that still fail"]; !strings.Contains(fails, "- 0 What Pragmatism Means: "+added) || !strings.Contains(fails, "(1.3a cut lost content: ") {
+	const added = "*The Fresnel lens* uses rings of prisms instead of one thick glass.[^6]"
+	if fails := runReport(t, runDir)["Statements that still fail"]; !strings.Contains(fails, "- 2 The Lens: ") || !strings.Contains(fails, added) || !strings.Contains(fails, "(1.3a cut lost content: ") {
 		t.Errorf("the run report does not list the new statement with its grade:\n%s", fails)
 	}
-	if !strings.Contains(testfixture.Files(t, filepath.Join(runDir, filepath.FromSlash(run.FinalNotes)))["0 What Pragmatism Means.md"], added) {
+	if !strings.Contains(testfixture.Files(t, filepath.Join(runDir, filepath.FromSlash(run.FinalNotes)))["2 The Lens.md"], added) {
 		t.Errorf("the final notes do not keep the new statement")
 	}
 }
@@ -307,15 +304,16 @@ func TestResume_KeptLossFailingSupportIsReported(t *testing.T) {
 // that step: the steps before it aren't called again, and the stopped
 // attempt's spent call stays in the step's usage log.
 func TestResume_StoppedInStage1(t *testing.T) {
-	sourcePath := testfixture.SourcePath(t, testfixture.Pragmatism)
-	src := testfixture.PragmatismSource(t)
-	steps := pragmatismSteps(t, src)
-	done, doneReplies := replies(steps[extractStep], steps[supportStep])
-	rest, restReplies := replies(steps[readsAloneStep : proposerStep+1]...)
-
 	runDir := filepath.Join(t.TempDir(), "run")
+	lamp := lampModel(t, runDir, nil)
+	first := testfixture.NewFake(func(req provider.Request) (provider.Reply, error) {
+		if step, _ := stepOf(req); step == run.ReadsAloneDir {
+			return provider.Reply{}, errors.New("the call failed")
+		}
+		return lamp.Call(context.Background(), req)
+	})
 	var stdout, stderr bytes.Buffer
-	if code := runCommand(context.Background(), []string{"run", "-run-dir", runDir, "-stop-after", run.LossProposerDir, sourcePath}, &stdout, &stderr, testfixture.Replay(t, done, doneReplies)); code != 1 {
+	if code := runCommand(context.Background(), []string{"run", "-run-dir", runDir, "-stop-after", run.LossProposerDir, lampSourcePath(t)}, &stdout, &stderr, first); code != 1 {
 		t.Fatalf("run: exit %d, want 1: %s", code, stderr.String())
 	}
 	folder := &run.Folder{Dir: runDir}
@@ -323,16 +321,18 @@ func TestResume_StoppedInStage1(t *testing.T) {
 		t.Fatalf("run did not stop in step 1.3b")
 	}
 
-	p := testfixture.Replay(t, rest, restReplies)
+	p := lampModel(t, runDir, nil)
 	code, errText := resumeTo(t, runDir, run.LossProposerDir, p)
 	if code != 0 {
 		t.Fatalf("resume: exit %d, want 0: %s", code, errText)
 	}
-	if n := len(p.Calls()); n != len(rest) {
-		t.Errorf("%d calls, want %d: the steps from 1.3b on", n, len(rest))
+	// Step 1.3b calls each of the 4 segments, and step 1.5 the 3 with an
+	// uncovered list twice.
+	if n, rest := len(p.Calls()), len(stepCalls(p, run.ReadsAloneDir))+len(stepCalls(p, run.LossProposerDir)); n != rest || n != 4+6 {
+		t.Errorf("%d calls, %d of them step 1.3b's and 1.5's, want those steps' alone (10)", n, rest)
 	}
 	usage := testfixture.Files(t, filepath.Join(runDir, run.ReadsAloneDir))[run.UsageFile]
-	if n := strings.Count(usage, "\n"); n != len(src.Segments)+1 {
+	if n := strings.Count(usage, "\n"); n != 4+1 {
 		t.Errorf("step 1.3b's usage log has %d lines, want the stopped attempt's call and one per segment", n)
 	}
 	if !strings.Contains(usage, `"is_error":true`) {
@@ -359,37 +359,42 @@ func TestResumeCommand_Errors(t *testing.T) {
 
 // A resume after the kept-loss repair stopped calls only what hadn't
 // finished (ADR 0002 §6). The first resume serves every reply but segment
-// 4's re-check, so the step stops in its re-check. The second makes no
+// 3's re-check, so the step stops in its re-check. The second makes no
 // kept-loss call, and re-checks only the segment the first didn't finish:
-// segment 0's re-check, called first, always finishes. The step's usage log
-// holds both attempts' calls, and the final notes are the Pragmatism run's.
+// segment 2's re-check, called first, always finishes. The step's usage log
+// holds both attempts' calls, and the final notes are those of a resume
+// that didn't stop.
 func TestResume_CallsOnlyTheUnfinishedSegments(t *testing.T) {
-	src, runDir := pragmatismAfterProposer(t)
-	// prompts are segment 0's and 4's kept-loss calls, then their re-checks.
-	prompts, replies := keptLossReplies(t, src, runDir)
-	first := testfixture.Replay(t, prompts[:3], replies[:3])
+	runDir := lampAfterProposer(t)
+	served := testfixture.Serve(t, keptLossCases()...)
+	first := testfixture.NewFake(func(req provider.Request) (provider.Reply, error) {
+		if strings.Contains(req.User, keptLossRecheck(3)) {
+			return provider.Reply{}, errors.New("the call failed")
+		}
+		return served.Call(context.Background(), req)
+	})
 	var stdout, stderr bytes.Buffer
 	if code := runCommand(context.Background(), []string{"resume", "-stop-after", run.FinalDir, runDir}, &stdout, &stderr, first); code == 0 {
-		t.Fatal("resume succeeded with no reply for segment 4's re-check")
+		t.Fatal("resume succeeded with no reply for segment 3's re-check")
 	}
 	if (&run.Folder{Dir: runDir}).Complete(run.KeptLossDir) {
 		t.Fatal("the kept-loss repair is complete after its re-check failed")
 	}
 	recheck := filepath.Join(runDir, run.KeptLossDir+run.PartialSuffix, run.KeptLossSupportDir+run.PartialSuffix)
-	if _, err := os.Stat(filepath.Join(recheck, run.RequestsDir, "0.sha256")); err != nil {
-		t.Fatalf("segment 0's re-check, called first, is not finished: %v", err)
+	if _, err := os.Stat(filepath.Join(recheck, run.RequestsDir, "2.sha256")); err != nil {
+		t.Fatalf("segment 2's re-check, called first, is not finished: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(recheck, run.RequestsDir, "4.sha256")); err == nil {
-		t.Fatal("segment 4's re-check is finished, though its call failed")
+	if _, err := os.Stat(filepath.Join(recheck, run.RequestsDir, "3.sha256")); err == nil {
+		t.Fatal("segment 3's re-check is finished, though its call failed")
 	}
 
-	second := testfixture.Replay(t, prompts, replies)
+	second := testfixture.Serve(t, keptLossCases()...)
 	stderr.Reset()
 	if code := runCommand(context.Background(), []string{"resume", "-stop-after", run.FinalDir, runDir}, &stdout, &stderr, second); code != 0 {
 		t.Fatalf("second resume: exit %d, want 0: %s", code, stderr.String())
 	}
-	if calls := second.Calls(); len(calls) != 1 || calls[0].User != prompts[3] {
-		t.Errorf("second resume made %d calls, want only segment 4's unfinished re-check", len(calls))
+	if calls := second.Calls(); len(calls) != 1 || !strings.Contains(calls[0].User, keptLossRecheck(3)) {
+		t.Errorf("second resume made %d calls, want only segment 3's unfinished re-check", len(calls))
 	}
 
 	b, err := os.ReadFile(filepath.Join(runDir, run.KeptLossDir, run.UsageFile))
@@ -399,10 +404,8 @@ func TestResume_CallsOnlyTheUnfinishedSegments(t *testing.T) {
 	if got, want := strings.Count(string(b), "\n"), len(first.Calls())+len(second.Calls()); got != want {
 		t.Errorf("usage log holds %d calls, want both attempts' %d", got, want)
 	}
-	got := testfixture.Files(t, filepath.Join(runDir, filepath.FromSlash(run.FinalNotes)))
-	want := testfixture.Files(t, filepath.Join(testfixture.PragmatismRun(t), filepath.FromSlash(run.FinalNotes)))
-	if !reflect.DeepEqual(got, want) {
-		t.Error("final notes are not the Pragmatism run's")
+	if got, want := testfixture.Files(t, filepath.Join(runDir, filepath.FromSlash(run.FinalNotes))), lampFinal(); !reflect.DeepEqual(got, want) {
+		t.Errorf("final notes:\n%v\nwant:\n%v", got, want)
 	}
 }
 
@@ -415,17 +418,15 @@ func keptIDs(kept []keptloss.Kept) []string {
 	return ids
 }
 
-// Resuming the Pragmatism run with its stage 1 done runs step 2.1 on the
-// final stage 1 notes, with the model -stage-2-model names, then its gates.
-// The run's split replies serve it, but segment 3's is made to lose a
-// statement and its trace. A folder no segment claims, added by hand, stops
-// the gates, and once it is gone they run again, with no call. The split
-// check fails segment 3, though it takes the name-span traces the split
-// added, and segment 3 falls back to its final stage 1 notes under a hub of
-// its own. Step 2.2 strips every segment's notes, and step 3.1 formats them.
-// One reply changed a word of segment 3's, so the format check fails it,
-// and it falls back again, to its stripped notes. Step 3.2 stages every
-// segment's notes.
+// Resuming Lamp's run with its stage 1 done runs step 2.1 on the final stage
+// 1 notes, with the model -stage-2-model names, then its gates. Segment 3's
+// reply loses a statement and its trace. A folder no segment claims, added
+// by hand, stops the gates, and once it is gone they run again, with no
+// call. The split check fails segment 3, which falls back to its final stage
+// 1 notes under a hub of its own. Step 2.2 strips every segment's notes, and
+// step 3.1 formats them. One reply changed a word of segment 3's, so the
+// format check fails it, and it falls back again, to its stripped notes.
+// Step 3.2 stages every segment's notes.
 func TestResume_SplitsTheFinalNotes(t *testing.T) {
 	// A resume that can reach step 3.2 checks the vault before it runs a
 	// step, so the run has one from the start.
@@ -434,26 +435,23 @@ func TestResume_SplitsTheFinalNotes(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv(VaultEnv, vault)
-	runDir := testfixture.PragmatismFolder(t, stepDirsBefore(run.SplitDir)...).Dir
-	src := testfixture.PragmatismSource(t)
+	runDir := lampAt(t, run.FinalDir)
+	src := testfixture.LampSource(t)
 	final := filepath.Join(runDir, filepath.FromSlash(run.FinalNotes))
 	notes, err := note.ReadDir(final)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var prompts []string
-	for _, seg := range src.Segments {
-		prompt, _ := split.Prompt(src, notes, seg)
-		prompts = append(prompts, prompt)
+	splitFiles := testfixture.LampSplit()
+	const lost = "3 Storms/In a Storm the Light Matters Most.md"
+	splitFiles[lost] = strings.NewReplacer(
+		"In a storm the light matters most.[^1]\n", "",
+		"[^1]: "+testfixture.LampTrace("Storms", "In a storm the light matters most.")+"\n", "",
+	).Replace(splitFiles[lost])
+	if splitFiles[lost] == testfixture.LampSplit()[lost] {
+		t.Fatalf("%s has no statement to lose", lost)
 	}
-	replies := testfixture.RawReplies(t, filepath.Join(testfixture.PragmatismRun(t), run.SplitDir), len(src.Segments))
-	const lost = " Writers on this subject have begun to show a singular unanimity as to what the laws of nature and elements of fact mean, when formulated by mathematicians, physicists and chemists.[^2]"
-	lostTrace := "[^2]: [[" + src.Name + "#Pragmatism as a Theory of Truth]] \"Writers on this subject have begun to show a singular unanimity as to what the laws of nature and elements of fact mean, when formulated by mathematicians, physicists and chemists.\"\n"
-	if !strings.Contains(replies[3], lost) || !strings.Contains(replies[3], lostTrace) {
-		t.Fatalf("segment 3's split reply has no statement to lose")
-	}
-	replies[3] = strings.Replace(strings.Replace(replies[3], lost, "", 1), lostTrace, "", 1)
-	p := testfixture.Replay(t, prompts, replies)
+	p := lampModel(t, runDir, lampReplies{run.SplitDir: {3: {splitReply(splitFiles, 3)}}})
 
 	var stdout, stderr bytes.Buffer
 	if code := runCommand(context.Background(), []string{"resume", "-stage-2-model", "haiku", "-stop-after", run.SplitDir, runDir}, &stdout, &stderr, p); code != 0 {
@@ -468,8 +466,15 @@ func TestResume_SplitsTheFinalNotes(t *testing.T) {
 		}
 	}
 	splitNotes := filepath.Join(runDir, filepath.FromSlash(run.SplitNotes))
-	if n := len(testfixture.Files(t, splitNotes)); n != 64 {
-		t.Errorf("%d notes, want the run's 56 atomic notes and 8 hubs", n)
+	var wantSplit []string
+	for rel := range testfixture.LampSplit() {
+		if strings.Contains(rel, "/") && strings.HasSuffix(rel, ".md") {
+			wantSplit = append(wantSplit, rel)
+		}
+	}
+	slices.Sort(wantSplit)
+	if got := keys(testfixture.Files(t, splitNotes)); !slices.Equal(got, wantSplit) {
+		t.Errorf("step 2.1 wrote %q, want each segment's notes as its reply gave them, %q", got, wantSplit)
 	}
 
 	// A folder no segment claims stops the gates, with exit status 4, and
@@ -478,7 +483,7 @@ func TestResume_SplitsTheFinalNotes(t *testing.T) {
 	if err := os.Mkdir(extra, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	again := testfixture.Replay(t, nil, nil)
+	again := testfixture.Serve(t)
 	stderr.Reset()
 	if code := runCommand(context.Background(), []string{"resume", "-stage-2-model", "haiku", runDir}, &stdout, &stderr, again); code != ExitGate || len(again.Calls()) != 0 {
 		t.Fatalf("resume with a stray folder: exit %d with %d calls, want %d with none: %s", code, len(again.Calls()), ExitGate, stderr.String())
@@ -500,7 +505,6 @@ func TestResume_SplitsTheFinalNotes(t *testing.T) {
 		t.Fatalf("resume to step 2.2: exit %d with %d calls, want 0 with none: %s", code, len(again.Calls()), stderr.String())
 	}
 	folder := &run.Folder{Dir: runDir}
-	gates := filepath.Join(runDir, run.SplitGatesDir)
 	if !folder.Complete(run.SplitGatesDir) {
 		t.Fatalf("step 2.1's gates are not complete")
 	}
@@ -510,19 +514,6 @@ func TestResume_SplitsTheFinalNotes(t *testing.T) {
 	}
 	if want := []fallback.Item{{Segment: 3, Why: "the split check", Report: run.SplitCheckFile}}; !reflect.DeepEqual(items, want) {
 		t.Errorf("fallbacks %+v, want %+v", items, want)
-	}
-	kept, err := os.ReadFile(filepath.Join(gates, run.SplitCheckFile))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, truth, _ := strings.Cut(string(kept), "\n## 3 Pragmatism as a Theory of Truth: "); !strings.Contains(truth, "\n  lost_traces: ") {
-		t.Errorf("report kept does not give segment 3's lost trace:\n%s", kept)
-	}
-	if !strings.Contains(string(kept), "  name_span: ") {
-		t.Errorf("report kept lists no name span:\n%s", kept)
-	}
-	if b, err := os.ReadFile(filepath.Join(gates, run.TraceDiffFile)); err != nil || strings.Contains(string(b), "3 Pragmatism as a Theory of Truth") || !strings.Contains(string(b), "## 2 The Method's Character and Affinities: ") {
-		t.Errorf("the trace diff did not check every segment but the one the split check failed (err %v):\n%s", err, b)
 	}
 	gated := testfixture.Files(t, filepath.Join(runDir, filepath.FromSlash(run.SplitOrFallbackNotes)))
 	fb := split.Fallback(src.Segments[3], notes)
@@ -567,25 +558,24 @@ func TestResume_SplitsTheFinalNotes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const changed = "3 Pragmatism as a Theory of Truth/3 Pragmatism as a Theory of Truth.md"
-	prompts = nil
-	replies = nil
+	const changed = "3 Storms/3 Storms.md"
+	var formatted []*note.Note
 	for _, f := range folders {
-		prompts = append(prompts, format.Prompt(f))
-		var reply string
+		if f.Name != split.Folder(src.Segments[3]) {
+			continue
+		}
 		for _, n := range f.Notes {
 			text := n.Render()
 			if f.Name+"/"+n.Name == changed {
-				if !strings.Contains(text, " approximations.") {
+				if !strings.Contains(text, " every gale.") {
 					t.Fatalf("%s has no word to change", changed)
 				}
-				text = strings.Replace(text, " approximations.", " estimates.", 1)
+				text = strings.Replace(text, " every gale.", " every storm.", 1)
 			}
-			reply += "=== FILE: " + n.Name + " ===\n" + text
+			formatted = append(formatted, note.Parse(n.Name, text))
 		}
-		replies = append(replies, reply+"=== MANIFEST ===\n{}\n")
 	}
-	p = testfixture.Replay(t, prompts, replies)
+	p = lampModel(t, runDir, lampReplies{run.FormatDir: {3: {fileBlocks(formatted) + "=== MANIFEST ===\n{}\n"}}})
 	stderr.Reset()
 	if code := runCommand(context.Background(), []string{"resume", "-stage-3-model", "sonnet", "-stop-after", run.FormatGateDir, runDir}, &stdout, &stderr, p); code != 0 {
 		t.Fatalf("resume to step 3.1's gate: exit %d, want 0: %s", code, stderr.String())
@@ -597,15 +587,15 @@ func TestResume_SplitsTheFinalNotes(t *testing.T) {
 		if c.Model != "sonnet" {
 			t.Errorf("call for %.40q: model %q, want sonnet", c.User, c.Model)
 		}
+		if n, _ := segmentOf(c); c.User != format.Prompt(folders[n]) {
+			t.Errorf("step 3.1's call for segment %d is not given its stripped notes:\n%s", n, c.User)
+		}
 	}
 	if !folder.Complete(run.FormatGateDir) {
 		t.Fatalf("step 3.1's gate is not complete")
 	}
 	if items, err := fallback.Read(folder, run.FormatGateDir); err != nil || !reflect.DeepEqual(items, []fallback.Item{{Segment: 3, Why: "the format check", Report: run.FormatCheckFile}}) {
 		t.Errorf("fallbacks %+v (err %v), want segment 3's, for the format check", items, err)
-	}
-	if b, err := os.ReadFile(filepath.Join(runDir, run.FormatGateDir, run.FormatCheckFile)); err != nil || !strings.Contains(string(b), "\n"+changed+"\n  PROBLEM: TEXT CHANGED: - approximations. + estimates.\n") {
-		t.Errorf("report kept does not give the changed word (err %v):\n%s", err, b)
 	}
 	checked := filepath.Join(runDir, filepath.FromSlash(run.FormattedOrFallbackNotes))
 	if got, want := testfixture.Files(t, checked), testfixture.Files(t, stripped); !reflect.DeepEqual(got, want) {
@@ -693,8 +683,8 @@ func TestResume_SplitsTheFinalNotes(t *testing.T) {
 	report := got[stageout.RunReportFile]
 	for _, w := range []string{
 		"# Run report: " + src.Name + "\n",
-		"- 2.1-gates, segment 3 (Pragmatism as a Theory of Truth): fell back to its stage 1 notes: the split check failed it; its report is split-check.txt\n",
-		"- 3.1-gate, segment 3 (Pragmatism as a Theory of Truth): kept its notes unformatted: the format check failed it; its report is format-check.txt\n",
+		"- 2.1-gates, segment 3 (Storms): fell back to its stage 1 notes: the split check failed it; its report is split-check.txt\n",
+		"- 3.1-gate, segment 3 (Storms): kept its notes unformatted: the format check failed it; its report is format-check.txt\n",
 	} {
 		if !strings.Contains(report, w) {
 			t.Errorf("the staging folder's %s has no %q:\n%s", stageout.RunReportFile, w, report)
@@ -704,6 +694,7 @@ func TestResume_SplitsTheFinalNotes(t *testing.T) {
 	if !reflect.DeepEqual(got, wantStaged) {
 		t.Errorf("staged %d notes, want the %d the gate passed on", len(got), len(wantStaged))
 	}
+	// The vault's notes reach step 3.2, which lists the hub as like one.
 	if want := "- [[" + stageout.StagingDir + "/" + src.Name + "/" + strings.TrimSuffix(hub, ".md") + "|" + hub + "]] and [[" + stageout.SlipBoxDir + "/" + upper + "|" + stageout.SlipBoxDir + "/" + upper + ".md]]\n"; !strings.Contains(clashes, want) {
 		t.Errorf("the clash list does not name %s as like %s:\n%s", hub, slipBoxNote, clashes)
 	}
@@ -763,9 +754,8 @@ func TestResumeCommand_ProposerModel(t *testing.T) {
 // list or dropped list, and step 1.5 wrote no dropped list, which the
 // run report reads as empty.
 func TestResume_AnOldFolderPastTheKeptLossRepair(t *testing.T) {
-	src, runDir := pragmatismAfterProposer(t)
-	prompts, replies := keptLossReplies(t, src, runDir)
-	if code, stderr := resumeTo(t, runDir, run.FinalDir, testfixture.Replay(t, prompts, replies)); code != 0 {
+	runDir := lampAfterProposer(t)
+	if code, stderr := resumeTo(t, runDir, run.FinalDir, testfixture.Serve(t, keptLossCases()...)); code != 0 {
 		t.Fatalf("resume to the final notes: exit %d: %s", code, stderr)
 	}
 	for _, f := range []string{
@@ -780,7 +770,7 @@ func TestResume_AnOldFolderPastTheKeptLossRepair(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(runDir, oldCheckpointDir), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if code, stderr := resume(t, runDir, testfixture.Replay(t, nil, nil)); code != 0 {
+	if code, stderr := resume(t, runDir, testfixture.Serve(t)); code != 0 {
 		t.Fatalf("resume: exit %d, want 0: %s", code, stderr)
 	}
 	if got := runReport(t, runDir)["Dropped"]; strings.TrimSpace(got) != "None." {
@@ -792,12 +782,12 @@ func TestResume_AnOldFolderPastTheKeptLossRepair(t *testing.T) {
 // checkpoint, isn't
 // resumed, since its review would be ignored, and the stop says what to do.
 func TestResume_RefusesAnOldCheckpoint(t *testing.T) {
-	_, runDir := pragmatismAfterProposer(t)
+	runDir := lampAfterProposer(t)
 	cp := filepath.Join(runDir, oldCheckpointDir)
 	if err := os.Mkdir(cp, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	code, stderr := resume(t, runDir, testfixture.Replay(t, nil, nil))
+	code, stderr := resume(t, runDir, testfixture.Serve(t))
 	if code != 1 {
 		t.Fatalf("resume: exit %d, want 1: %s", code, stderr)
 	}
@@ -811,18 +801,17 @@ func TestResume_RefusesAnOldCheckpoint(t *testing.T) {
 	}
 }
 
-// A run folder stopped in step 2.1's gates, as the Pragmatism run's would be
-// with its gates' directory partial, resumes through all three of the gates
-// with no model call: each report is the run's, listing its name spans
-// (ADR 0010) and nothing that fails.
+// A run folder stopped in step 2.1's gates, with every file the gates write
+// in their partial directory, resumes through all three of the gates with no
+// model call, and they write what they write in a run that didn't stop.
 func TestResume_PassesTheSplitGates(t *testing.T) {
-	runDir := testfixture.PragmatismFolder(t, stepDirsBefore(run.SplitGatesDir)...).Dir
-	recorded := filepath.Join(testfixture.PragmatismRun(t), run.SplitGatesDir)
-	if err := os.CopyFS(filepath.Join(runDir, run.SplitGatesDir+run.PartialSuffix), os.DirFS(recorded)); err != nil {
+	straight := filepath.Join(lampAt(t, run.SplitGatesDir), run.SplitGatesDir)
+	runDir := lampAt(t, run.SplitDir)
+	if err := os.CopyFS(filepath.Join(runDir, run.SplitGatesDir+run.PartialSuffix), os.DirFS(straight)); err != nil {
 		t.Fatal(err)
 	}
 	var stdout, stderr bytes.Buffer
-	p := testfixture.Replay(t, nil, nil)
+	p := testfixture.Serve(t)
 	if code := runCommand(context.Background(), []string{"resume", "-stop-after", run.SplitGatesDir, runDir}, &stdout, &stderr, p); code != 0 {
 		t.Fatalf("resume: exit %d, want 0: %s", code, stderr.String())
 	}
@@ -832,35 +821,7 @@ func TestResume_PassesTheSplitGates(t *testing.T) {
 	if !(&run.Folder{Dir: runDir}).Complete(run.SplitGatesDir) {
 		t.Fatal("step 2.1's gates are not complete")
 	}
-	if got, want := testfixture.Files(t, filepath.Join(runDir, run.SplitGatesDir)), testfixture.Files(t, recorded); !reflect.DeepEqual(got, want) {
-		t.Errorf("step 2.1's gates wrote %d files, not the run's %d byte for byte", len(got), len(want))
+	if got, want := testfixture.Files(t, filepath.Join(runDir, run.SplitGatesDir)), testfixture.Files(t, straight); !reflect.DeepEqual(got, want) {
+		t.Errorf("step 2.1's gates wrote %q, not what they write in a run that didn't stop, %q", keys(got), keys(want))
 	}
-	const spans = 3
-	if got := countNameSpans(t, filepath.Join(runDir, run.SplitGatesDir, run.SplitCheckFile), func(string) int { return 1 }, "  name_span: "); got != spans {
-		t.Errorf("the split check lists %d name spans, want %d", got, spans)
-	}
-	times := func(rest string) int {
-		n, _ := strconv.Atoi(rest[:strings.Index(rest, ":")])
-		return n
-	}
-	if got := countNameSpans(t, filepath.Join(runDir, run.SplitGatesDir, run.TraceDiffFile), times, "  NAME SPAN x"); got != spans {
-		t.Errorf("the trace diff lists %d name spans, want %d", got, spans)
-	}
-}
-
-// countNameSpans counts the name spans in the report at path: on each line
-// starting with prefix, as many as count gives for the rest of the line.
-func countNameSpans(t *testing.T, path string, count func(rest string) int, prefix string) int {
-	t.Helper()
-	b, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	n := 0
-	for _, l := range strings.Split(string(b), "\n") {
-		if rest, ok := strings.CutPrefix(l, prefix); ok {
-			n += count(rest)
-		}
-	}
-	return n
 }

@@ -14,19 +14,18 @@ import (
 	"github.com/corygyarmathy/slipbox/internal/testfixture"
 )
 
-// pragmatismAtSplit is a run folder of the Pragmatism run with every step
-// before step 2.1's gates complete, copied whole: its split passes the
-// gates.
-func pragmatismAtSplit(t *testing.T) string {
+// lampAtSplit is a run folder of Lamp with every step before step 2.1's
+// gates complete: its split, LampSplit, passes the gates.
+func lampAtSplit(t *testing.T) string {
 	t.Helper()
-	return testfixture.PragmatismFolder(t, stepDirsBefore(run.SplitGatesDir)...).Dir
+	return lampAt(t, run.SplitDir)
 }
 
 // resumeStop runs `s2n resume -stop-after stopAfter` on runDir with no
 // model call, and gives its exit code and stderr.
 func resumeStop(t *testing.T, runDir, stopAfter string) (int, string) {
 	t.Helper()
-	p := testfixture.Replay(t, nil, nil)
+	p := testfixture.Serve(t)
 	var stdout, stderr bytes.Buffer
 	code := runCommand(context.Background(), []string{"resume", "-stop-after", stopAfter, runDir}, &stdout, &stderr, p)
 	if len(p.Calls()) != 0 {
@@ -77,14 +76,14 @@ func wantStopped(t *testing.T, runDir, stderr string) {
 // summary. A resume that stops again writes it anew, and once the stage 1
 // note is fixed, a resume falls back and removes it.
 func TestStop_FallbackStripCheck(t *testing.T) {
-	runDir := pragmatismAtSplit(t)
-	folder := filepath.Join(runDir, filepath.FromSlash(run.SplitNotes), "1 History of the Method")
+	runDir := lampAtSplit(t)
+	folder := filepath.Join(runDir, filepath.FromSlash(run.SplitNotes), "1 The Keeper's Watch")
 	notes, err := note.ReadDir(folder)
 	if err != nil {
 		t.Fatal(err)
 	}
 	target := notes[0]
-	if target.Name == "History of the Method.md" {
+	if target.Name == "The Keeper's Watch.md" {
 		target = notes[1]
 	}
 	for i, l := range target.Lines {
@@ -96,13 +95,13 @@ func TestStop_FallbackStripCheck(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(folder, target.Name), []byte(target.Render()), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	stage1 := filepath.Join(runDir, filepath.FromSlash(run.FinalNotes), "1 History of the Method.md")
+	stage1 := filepath.Join(runDir, filepath.FromSlash(run.FinalNotes), "1 The Keeper's Watch.md")
 	b, err := os.ReadFile(stage1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	original := string(b)
-	noH1 := strings.Replace(original, "# 1 History of the Method\n", "", 1)
+	noH1 := strings.Replace(original, "# 1 The Keeper's Watch\n", "", 1)
 	if noH1 == original {
 		t.Fatalf("%s has no H1 to drop", stage1)
 	}
@@ -112,7 +111,7 @@ func TestStop_FallbackStripCheck(t *testing.T) {
 
 	code, stderr := resumeStop(t, runDir, run.SplitGatesDir)
 	wantStop(t, runDir, code, stderr,
-		"s2n resume: the strip check of the fallback notes failed on segment 1 (History of the Method); its report is "+filepath.Join(runDir, run.SplitGatesDir+run.PartialSuffix, run.FallbackStripCheckFile)+".\n",
+		"s2n resume: the strip check of the fallback notes failed on segment 1 (The Keeper’s Watch); its report is "+filepath.Join(runDir, run.SplitGatesDir+run.PartialSuffix, run.FallbackStripCheckFile)+".\n",
 		"This atomic note has no H1 for step 2.2 to put the source footnote after.\n   "+stage1+"\n",
 		"- For each atomic note without an H1: the segment failed step 2.1 and falls back to this final stage 1 note, so give it an H1, `# <title>`, above its statements; or delete "+filepath.Join(runDir, run.SplitDir)+" to split every segment again.\n",
 	)
@@ -138,7 +137,7 @@ func TestStop_FallbackStripCheck(t *testing.T) {
 // A resume removes STOPPED.md when it starts, before it runs a step, even
 // one that then stops on something other than a gate.
 func TestResume_RemovesStopped(t *testing.T) {
-	runDir := pragmatismAtSplit(t)
+	runDir := lampAtSplit(t)
 	stopped := filepath.Join(runDir, run.StoppedFile)
 	if err := os.WriteFile(stopped, []byte("an earlier stop's\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -157,7 +156,7 @@ func TestResume_RemovesStopped(t *testing.T) {
 // A STOPPED.md that can't be removed, such as a directory with a file in it,
 // stops a resume before it runs a step, naming the path.
 func TestResume_StoppedNotRemoved(t *testing.T) {
-	runDir := pragmatismAtSplit(t)
+	runDir := lampAtSplit(t)
 	stopped := filepath.Join(runDir, run.StoppedFile)
 	if err := os.MkdirAll(filepath.Join(stopped, "kept"), 0o755); err != nil {
 		t.Fatal(err)
@@ -192,7 +191,7 @@ func TestPrintStop_NotWritten(t *testing.T) {
 // what its stop always said, then where STOPPED.md is, which holds the
 // same text.
 func TestStop_FolderCheck(t *testing.T) {
-	runDir := pragmatismAtSplit(t)
+	runDir := lampAtSplit(t)
 	extra := filepath.Join(runDir, filepath.FromSlash(run.SplitNotes), "99 Extra")
 	if err := os.MkdirAll(extra, 0o755); err != nil {
 		t.Fatal(err)
