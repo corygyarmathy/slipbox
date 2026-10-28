@@ -1,3 +1,0 @@
-# 0 What Pragmatism Means
-
-pass 6 / dangling 0 / outside-frame 0

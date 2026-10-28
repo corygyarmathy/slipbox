@@ -1,5 +1,0 @@
-# 3 Pragmatism as a Theory of Truth
-
-No dangling or outside-frame references found.
-
-pass 18 / dangling 0 / outside-frame 0
