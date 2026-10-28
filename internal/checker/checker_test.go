@@ -1,9 +1,7 @@
 package checker_test
 
 import (
-	"path/filepath"
 	"reflect"
-	"regexp"
 	"testing"
 
 	"github.com/corygyarmathy/slipbox/internal/checker"
@@ -11,7 +9,6 @@ import (
 	"github.com/corygyarmathy/slipbox/internal/readsalone"
 	"github.com/corygyarmathy/slipbox/internal/source"
 	"github.com/corygyarmathy/slipbox/internal/supportcheck"
-	"github.com/corygyarmathy/slipbox/internal/testfixture"
 )
 
 func TestParse(t *testing.T) {
@@ -24,6 +21,8 @@ func TestParse(t *testing.T) {
 		"- [pass] \"A pass\": fine\n" +
 		"- [weak / unclear] \"Half a grade\": kept\n" +
 		"- [unclear] \"Not a grade\": kept\n" +
+		"- [pass-with-note] \"A pass, hyphenated\": kept\n" +
+		"- \"we\": generic, no bracket\n" +
 		"- [fail] no quotes: a flag\n" +
 		"- [^6] \"a name span\": pass.\n" +
 		"pass 3 / weak 0 / fail 0 / dangling 0 / outside-frame 0\n" +
@@ -46,6 +45,8 @@ func TestParse(t *testing.T) {
 			{H1: "1 A", Text: `- [pass] "A pass": fine`},
 			{H1: "1 A", Text: `- [weak / unclear] "Half a grade": kept`},
 			{H1: "1 A", Text: `- [unclear] "Not a grade": kept`},
+			{H1: "1 A", Text: `- [pass-with-note] "A pass, hyphenated": kept`},
+			{H1: "1 A", Text: `- "we": generic, no bracket`},
 			{H1: "1 A", Text: `- [^6] "a name span": pass.`},
 			{H1: "1 A", Text: "pass 3 / weak 0 / fail 0 / dangling 0 / outside-frame 0"},
 			{H1: "3 C", Text: "#no space"},
@@ -85,6 +86,9 @@ func TestParse_OnlyTheCheckGrades(t *testing.T) {
 // A graded line need not have the briefs' shape to be a flag. Each quoted
 // span before the first colon outside quotes, or in the line if it has no
 // such colon, is a statement; a line with none is one flag with no statement.
+// A span ends only at its own closing quote, so a statement keeps the single
+// quotes and apostrophes it holds. A line whose reason says the statement
+// passes is still a flag: the parser reads shape, not intent.
 func TestParse_GradedShapes(t *testing.T) {
 	report := "# 1 A\n" +
 		"- [weak] \"One trace ref…\" [^15]: reason\n" +
@@ -92,6 +96,9 @@ func TestParse_GradedShapes(t *testing.T) {
 		"- [fail] \"A footnote number.\" (fn 40): not in the section\n" +
 		"- [weak] \"First…\" [^15] and “Second…” [^16]: the pair works\n" +
 		"- [dangling] \"One…\" / \"Other…\": each a flag\n" +
+		"- [weak] \"Wick…\", \"Oil…\", \"Glass…\", \"Log…\": a list of four\n" +
+		"- [cut lost content] \"The keeper's 'great' lamp…\": the cut \"of the harbour\" named it\n" +
+		"- [dangling] \"He lit it.\": \"He\" is the keeper. Pass, not dangling.\n" +
 		"- [reworded] The same statement: the source reads \"given\"\n" +
 		"- [dangling] \"Its quote: has a colon\": \"this\": no antecedent\n" +
 		"- [weak] \"No colon\" anywhere\n"
@@ -104,6 +111,12 @@ func TestParse_GradedShapes(t *testing.T) {
 			{H1: "1 A", Grades: []checker.Grade{checker.Weak}, Statement: "Second…", Reason: "the pair works"},
 			{H1: "1 A", Grades: []checker.Grade{checker.Dangling}, Statement: "One…", Reason: "each a flag"},
 			{H1: "1 A", Grades: []checker.Grade{checker.Dangling}, Statement: "Other…", Reason: "each a flag"},
+			{H1: "1 A", Grades: []checker.Grade{checker.Weak}, Statement: "Wick…", Reason: "a list of four"},
+			{H1: "1 A", Grades: []checker.Grade{checker.Weak}, Statement: "Oil…", Reason: "a list of four"},
+			{H1: "1 A", Grades: []checker.Grade{checker.Weak}, Statement: "Glass…", Reason: "a list of four"},
+			{H1: "1 A", Grades: []checker.Grade{checker.Weak}, Statement: "Log…", Reason: "a list of four"},
+			{H1: "1 A", Grades: []checker.Grade{checker.CutLostContent}, Statement: "The keeper's 'great' lamp…", Reason: `the cut "of the harbour" named it`},
+			{H1: "1 A", Grades: []checker.Grade{checker.Dangling}, Statement: "He lit it.", Reason: `"He" is the keeper. Pass, not dangling.`},
 			{H1: "1 A", Grades: []checker.Grade{checker.Reworded}, Statement: "", Reason: `The same statement: the source reads "given"`},
 			{H1: "1 A", Grades: []checker.Grade{checker.Dangling}, Statement: "Its quote: has a colon", Reason: `"this": no antecedent`},
 			{H1: "1 A", Grades: []checker.Grade{checker.Weak}, Statement: "No colon", Reason: `"No colon" anywhere`},
@@ -115,44 +128,16 @@ func TestParse_GradedShapes(t *testing.T) {
 	}
 }
 
-// TestParse_RecordedReplies parses every reply of both checks that the
-// Pragmatism run recorded, step 1.4's re-checks included, and checks that no
-// line with a bracket naming one of the check's grades is left out of the
-// flags.
-func TestParse_RecordedReplies(t *testing.T) {
-	support := regexp.MustCompile(`\b(weak|fail|dangling|outside-frame|cut lost content|reworded|wrong referent|not a name span|cut would do|reads wrong)\b`)
-	readsAlone := regexp.MustCompile(`\b(dangling|outside-frame)\b`)
-	trial := testfixture.PragmatismRun(t)
-	n := 0
-	for _, c := range []struct {
-		dir     string
-		replies int
-		grades  []checker.Grade
-		grade   *regexp.Regexp
-	}{
-		{"1.3a-support-check", 8, supportcheck.Grades, support},
-		{"1.3b-reads-alone-check", 8, readsalone.Grades, readsAlone},
-		{"1.4-recheck-1.3a-support-check", 4, supportcheck.Grades, support},
-		{"1.4-recheck-1.3b-reads-alone-check", 4, readsalone.Grades, readsAlone},
-		{"1.4-kept-loss-repair/recheck-1.3a-support-check", 1, supportcheck.Grades, support},
-	} {
-		replies := testfixture.Files(t, filepath.Join(trial, filepath.FromSlash(c.dir), "raw"))
-		if len(replies) != c.replies {
-			t.Errorf("%s: %d replies, want %d", c.dir, len(replies), c.replies)
-		}
-		bracket := regexp.MustCompile(`^[-*]\s+\[([^\]]+)\]`)
-		for name, reply := range replies {
-			r := checker.Parse(reply, c.grades)
-			n += len(r.Flags)
-			for _, l := range r.Other {
-				if m := bracket.FindStringSubmatch(l.Text); m != nil && c.grade.MatchString(m[1]) {
-					t.Errorf("%s/%s: graded line is not a flag: %.80q", c.dir, name, l.Text)
-				}
-			}
-		}
+// A report need not end in a newline: a checker's reply often doesn't, and
+// its last line is read like any other.
+func TestParse_NoFinalNewline(t *testing.T) {
+	report := "# 1 A\n\n- [weak] \"Last…\": the reply ends here"
+	want := checker.Report{
+		Flags: []checker.Flag{{H1: "1 A", Grades: []checker.Grade{checker.Weak}, Statement: "Last…", Reason: "the reply ends here"}},
+		Other: []checker.Line{},
 	}
-	if n == 0 {
-		t.Error("no flags in any recorded reply, so the test shows nothing")
+	if got := checker.Parse(report, supportcheck.Grades); !reflect.DeepEqual(got, want) {
+		t.Errorf("Parse:\n got %+v\nwant %+v", got, want)
 	}
 }
 
