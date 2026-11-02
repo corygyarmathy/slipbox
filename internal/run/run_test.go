@@ -156,6 +156,39 @@ func TestNewIn(t *testing.T) {
 	}
 }
 
+// The state directory is s2n's in $XDG_STATE_HOME, or in ~/.local/state
+// when the variable is unset or not an absolute path.
+func TestStateDir(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", "/state")
+	if got, err := run.StateDir(); err != nil || got != filepath.Join("/state", "s2n") {
+		t.Errorf("StateDir() = %q, %v", got, err)
+	}
+	t.Setenv("HOME", "/home/u")
+	for _, state := range []string{"", "relative"} {
+		t.Setenv("XDG_STATE_HOME", state)
+		if got, err := run.StateDir(); err != nil || got != filepath.Join("/home/u", ".local", "state", "s2n") {
+			t.Errorf("XDG_STATE_HOME=%q: StateDir() = %q, %v", state, got, err)
+		}
+	}
+}
+
+// A run folder is logged once it holds the line it appended to the run log.
+func TestFolder_Logged(t *testing.T) {
+	f, err := run.New(filepath.Join(t.TempDir(), "run"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Logged() {
+		t.Error("a new run folder is logged")
+	}
+	if err := f.WriteLogged([]byte("{}\n")); err != nil {
+		t.Fatal(err)
+	}
+	if !f.Logged() {
+		t.Errorf("a run folder holding %s is not logged", run.LoggedFile)
+	}
+}
+
 func TestDefaultRoot(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", "/state")
 	if got, err := run.DefaultRoot(); err != nil || got != filepath.Join("/state", "s2n", "runs") {
