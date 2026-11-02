@@ -113,12 +113,30 @@ func (c *Coverage) String() string {
 	st := c.Stats
 	fmt.Fprintf(&b, "\n## Totals\n  exact %d, fuzzy %d, broken %d, untraced statements %d, statements %d\n",
 		st.Exact, st.Fuzzy, st.Broken, st.UntracedStatements, st.Statements)
-	fmt.Fprintf(&b, "  covered sentences: %d/%d", c.Covered, c.Total)
-	if c.Total > 0 {
-		fmt.Fprintf(&b, " (%.0f%%)", float64(100*c.Covered)/float64(c.Total))
-	}
-	b.WriteByte('\n')
+	fmt.Fprintf(&b, "  covered sentences: %s\n", c.Totals())
 	return b.String()
+}
+
+// CoverageTotals is the coverage check's totals: the frame's sentences, and
+// how many of them verified traces fully span.
+type CoverageTotals struct {
+	Covered int `json:"covered"`
+	Total   int `json:"total"`
+}
+
+// Totals gives the coverage check's totals.
+func (c *Coverage) Totals() CoverageTotals {
+	return CoverageTotals{Covered: c.Covered, Total: c.Total}
+}
+
+// String renders the totals as covered/total and the percentage covered,
+// which a frame with no sentences to count has none of.
+func (t CoverageTotals) String() string {
+	s := fmt.Sprintf("%d/%d", t.Covered, t.Total)
+	if t.Total > 0 {
+		s += fmt.Sprintf(" (%.0f%%)", float64(100*t.Covered)/float64(t.Total))
+	}
+	return s
 }
 
 // coverage runs the coverage check on the verified traces' spans in r.

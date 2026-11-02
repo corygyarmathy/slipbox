@@ -742,3 +742,62 @@ func files(t *testing.T, dir string) map[string]string {
 	}
 	return out
 }
+
+// Step 1.2 writes its coverage totals into its directory, and ReadCoverage
+// reads back the totals the check gave.
+func TestReadCoverage_ReadsWhatRunWrote(t *testing.T) {
+	src := stoneArch(t)
+	folder, err := run.New(filepath.Join(t.TempDir(), "run"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	notesDir := filepath.Join(folder.Dir, run.ExtractDir, run.NotesDir)
+	writeNotes(t, notesDir, map[string]string{
+		"1 Arches.md": "# 1 Arches\n\nArches.[^1]\n\n" +
+			"[^1]: [[S#Arches]] \"Similarly, a stone arch and a brick arch are not two sciences\"\n",
+	})
+	if err := mechcheck.Run(src, folder); err != nil {
+		t.Fatal(err)
+	}
+	notes, err := note.ReadDir(notesDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := mechcheck.Check(src, notes).Coverage.Totals()
+	if want.Covered == 0 || want.Covered == want.Total {
+		t.Fatalf("the check covered %v, want some sentences but not all", want)
+	}
+	got, err := mechcheck.ReadCoverage(folder, run.MechanicalCheckDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Errorf("ReadCoverage = %+v, want %+v", got, want)
+	}
+}
+
+// A missing coverage totals file is an error naming it.
+func TestReadCoverage_MissingFile(t *testing.T) {
+	folder := &run.Folder{Dir: t.TempDir()}
+	_, err := mechcheck.ReadCoverage(folder, run.MechanicalCheckDir)
+	if err == nil || !strings.Contains(err.Error(), filepath.Join(run.MechanicalCheckDir, run.CoverageTotalsFile)) {
+		t.Errorf("err = %v, want one naming %s", err, run.CoverageTotalsFile)
+	}
+}
+
+// The totals give the percentage covered, and no percentage for a frame with
+// no sentences to count.
+func TestCoverageTotals_String(t *testing.T) {
+	for _, tt := range []struct {
+		totals mechcheck.CoverageTotals
+		want   string
+	}{
+		{mechcheck.CoverageTotals{Covered: 41, Total: 50}, "41/50 (82%)"},
+		{mechcheck.CoverageTotals{Covered: 0, Total: 3}, "0/3 (0%)"},
+		{mechcheck.CoverageTotals{}, "0/0"},
+	} {
+		if got := tt.totals.String(); got != tt.want {
+			t.Errorf("%+v.String() = %q, want %q", tt.totals, got, tt.want)
+		}
+	}
+}
