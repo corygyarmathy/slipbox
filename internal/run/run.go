@@ -11,9 +11,17 @@
 // the state directory (package runlog).
 //
 // The run's first act copies the source into the folder, so later steps and
-// `s2n resume` read the frame the run started from:
+// `s2n resume` read the frame the run started from, and writes its options
+// beside it, before the first step runs:
 //
 //	source/<source name>.md   the source as the run read it
+//	OPTIONS.json              every flag that shapes the run, as it is run, which
+//	                          `s2n resume` reads in place of the flags and writes
+//	                          back with the ones it may change (package main says
+//	                          which)
+//
+// A run folder made before runs recorded their options has no OPTIONS.json,
+// and resumes from the flags it is given.
 //
 // A run a gate stopped has, at the top of its folder, a summary of the stop
 // for the human: no step reads it, and `s2n resume` removes it when it
@@ -197,6 +205,10 @@ const SourceDir = "source"
 // StoppedFile is the summary of a gate's stop, at the top of the run folder,
 // there only while the run is stopped.
 const StoppedFile = "STOPPED.md"
+
+// OptionsFile is the run's options, at the top of the run folder, written
+// before the run's first step.
+const OptionsFile = "OPTIONS.json"
 
 // LoggedFile is the run's line in the run log, at the top of the run folder,
 // there once the run has appended it.
@@ -429,6 +441,22 @@ func (f *Folder) ClearStopped() error {
 		return err
 	}
 	return nil
+}
+
+// OptionsPath is the path of the run's OptionsFile.
+func (f *Folder) OptionsPath() string {
+	return filepath.Join(f.Dir, OptionsFile)
+}
+
+// WriteOptions writes b, the run's options, to its OptionsFile.
+func (f *Folder) WriteOptions(b []byte) error {
+	return os.WriteFile(f.OptionsPath(), b, 0o644)
+}
+
+// ReadOptions reads the run's OptionsFile. The error wraps fs.ErrNotExist for
+// a run folder made before runs recorded their options.
+func (f *Folder) ReadOptions() ([]byte, error) {
+	return os.ReadFile(f.OptionsPath())
 }
 
 // LoggedPath is the path of the run's LoggedFile.

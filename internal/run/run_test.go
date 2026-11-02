@@ -2,6 +2,7 @@ package run_test
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -186,6 +187,27 @@ func TestFolder_Logged(t *testing.T) {
 	}
 	if !f.Logged() {
 		t.Errorf("a run folder holding %s is not logged", run.LoggedFile)
+	}
+}
+
+// A new run folder holds no options, which ReadOptions says as
+// fs.ErrNotExist, and once written they read back as written.
+func TestFolder_Options(t *testing.T) {
+	f, err := run.New(filepath.Join(t.TempDir(), "run"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.ReadOptions(); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("ReadOptions on a new run folder: %v, want fs.ErrNotExist", err)
+	}
+	if err := f.WriteOptions([]byte("{}\n")); err != nil {
+		t.Fatal(err)
+	}
+	if b, err := f.ReadOptions(); err != nil || string(b) != "{}\n" {
+		t.Errorf("ReadOptions = %q, %v, want what was written", b, err)
+	}
+	if got, want := f.OptionsPath(), filepath.Join(f.Dir, run.OptionsFile); got != want {
+		t.Errorf("OptionsPath() = %q, want %q", got, want)
 	}
 }
 

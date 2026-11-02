@@ -419,23 +419,22 @@ func keptIDs(kept []keptloss.Kept) []string {
 }
 
 // Resuming Lamp's run with its stage 1 done runs step 2.1 on the final stage
-// 1 notes, with the model -stage-2-model names, then its gates. Segment 3's
-// reply loses a statement and its trace. A folder no segment claims, added
-// by hand, stops the gates, and once it is gone they run again, with no
-// call. The split check fails segment 3, which falls back to its final stage
+// 1 notes, with the model the run was given by -stage-2-model, then its
+// gates. Segment 3's reply loses a statement and its trace. With no vault,
+// a resume that can reach step 3.2 stops before any step. A folder no
+// segment claims, added by hand, stops the gates, and once it is gone they
+// run again, with no call. The split check fails segment 3, which falls back to its final stage
 // 1 notes under a hub of its own. Step 2.2 strips every segment's notes, and
 // step 3.1 formats them. One reply changed a word of segment 3's, so the
 // format check fails it, and it falls back again, to its stripped notes.
 // Step 3.2 stages every segment's notes.
 func TestResume_SplitsTheFinalNotes(t *testing.T) {
-	// A resume that can reach step 3.2 checks the vault before it runs a
-	// step, so the run has one from the start.
 	vault := filepath.Join(t.TempDir(), "vault")
 	if err := os.MkdirAll(filepath.Join(vault, stageout.SlipBoxDir), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv(VaultEnv, vault)
-	runDir := lampAt(t, run.FinalDir)
+	t.Setenv(VaultEnv, "")
+	runDir, _, _ := lampRun(t, nil, "-stage-2-model", "haiku", "-stage-3-model", "sonnet", "-stop-after", run.FinalDir)
 	src := testfixture.LampSource(t)
 	final := filepath.Join(runDir, filepath.FromSlash(run.FinalNotes))
 	notes, err := note.ReadDir(final)
@@ -454,7 +453,7 @@ func TestResume_SplitsTheFinalNotes(t *testing.T) {
 	p := lampModel(t, runDir, lampReplies{run.SplitDir: {3: {splitReply(splitFiles, 3)}}})
 
 	var stdout, stderr bytes.Buffer
-	if code := runCommand(context.Background(), []string{"resume", "-stage-2-model", "haiku", "-stop-after", run.SplitDir, runDir}, &stdout, &stderr, p); code != 0 {
+	if code := runCommand(context.Background(), []string{"resume", "-stop-after", run.SplitDir, runDir}, &stdout, &stderr, p); code != 0 {
 		t.Fatalf("resume: exit %d, want 0: %s", code, stderr.String())
 	}
 	if n := len(p.Calls()); n != len(src.Segments) {
@@ -477,20 +476,33 @@ func TestResume_SplitsTheFinalNotes(t *testing.T) {
 		t.Errorf("step 2.1 wrote %q, want each segment's notes as its reply gave them, %q", got, wantSplit)
 	}
 
+	// With no vault the run stops before step 2.1's gates.
+	again := testfixture.Serve(t)
+	stderr.Reset()
+	if code := runCommand(context.Background(), []string{"resume", runDir}, &stdout, &stderr, again); code != 1 || len(again.Calls()) != 0 {
+		t.Fatalf("resume with no vault: exit %d with %d calls, want 1 with none: %s", code, len(again.Calls()), stderr.String())
+	}
+	if want := "Give -vault DIR or set $" + VaultEnv + ", then run s2n resume " + runDir; !strings.Contains(stderr.String(), want) {
+		t.Errorf("stderr %q does not say %q", stderr.String(), want)
+	}
+	if (&run.Folder{Dir: runDir}).Complete(run.SplitGatesDir) {
+		t.Fatal("step 2.1's gates ran with no vault")
+	}
+
 	// A folder no segment claims stops the gates, with exit status 4, and
-	// says what to do.
+	// says what to do. The resume is given the vault, which the run folder
+	// keeps for the resumes after it.
 	extra := filepath.Join(splitNotes, "99 Extra")
 	if err := os.Mkdir(extra, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	again := testfixture.Serve(t)
 	stderr.Reset()
-	if code := runCommand(context.Background(), []string{"resume", "-stage-2-model", "haiku", runDir}, &stdout, &stderr, again); code != ExitGate || len(again.Calls()) != 0 {
+	if code := runCommand(context.Background(), []string{"resume", "-vault", vault, runDir}, &stdout, &stderr, again); code != ExitGate || len(again.Calls()) != 0 {
 		t.Fatalf("resume with a stray folder: exit %d with %d calls, want %d with none: %s", code, len(again.Calls()), ExitGate, stderr.String())
 	}
 	for _, want := range []string{
 		`step 2.1's folder check failed on folder "99 Extra". No segment of the source has the folder name of ` + extra + ".",
-		"then run s2n resume -stage-2-model haiku " + runDir,
+		"then run s2n resume " + runDir,
 	} {
 		if !strings.Contains(stderr.String(), want) {
 			t.Errorf("stderr %q does not say %q", stderr.String(), want)
@@ -551,8 +563,8 @@ func TestResume_SplitsTheFinalNotes(t *testing.T) {
 		}
 	}
 
-	// Step 3.1 formats the stripped notes, with the model -stage-3-model
-	// names. Each reply is "no change", every note as it came, but for one
+	// Step 3.1 formats the stripped notes, with the model the run was given
+	// by -stage-3-model. Each reply is "no change", every note as it came, but for one
 	// word of segment 3's main note, which its fallback kept.
 	folders, err := split.ReadFolders(stripped)
 	if err != nil {
@@ -577,7 +589,7 @@ func TestResume_SplitsTheFinalNotes(t *testing.T) {
 	}
 	p = lampModel(t, runDir, lampReplies{run.FormatDir: {3: {fileBlocks(formatted) + "=== MANIFEST ===\n{}\n"}}})
 	stderr.Reset()
-	if code := runCommand(context.Background(), []string{"resume", "-stage-3-model", "sonnet", "-stop-after", run.FormatGateDir, runDir}, &stdout, &stderr, p); code != 0 {
+	if code := runCommand(context.Background(), []string{"resume", "-stop-after", run.FormatGateDir, runDir}, &stdout, &stderr, p); code != 0 {
 		t.Fatalf("resume to step 3.1's gate: exit %d, want 0: %s", code, stderr.String())
 	}
 	if n := len(p.Calls()); n != len(src.Segments) {
@@ -602,17 +614,7 @@ func TestResume_SplitsTheFinalNotes(t *testing.T) {
 		t.Errorf("step 3.1's gate passed on %d notes, not the %d stripped ones: each reply was no change, but for segment 3's, which fell back", len(got), len(want))
 	}
 
-	// With no vault the run stops before step 3.2.
-	t.Setenv(VaultEnv, "")
-	stderr.Reset()
-	if code := runCommand(context.Background(), []string{"resume", runDir}, &stdout, &stderr, again); code != 1 || len(again.Calls()) != 0 {
-		t.Fatalf("resume with no vault: exit %d with %d calls, want 1 with none: %s", code, len(again.Calls()), stderr.String())
-	}
-	if want := "Give -vault DIR or set $" + VaultEnv + ", then run s2n resume " + runDir; !strings.Contains(stderr.String(), want) {
-		t.Errorf("stderr %q does not say %q", stderr.String(), want)
-	}
-
-	// Given a vault, step 3.2 stages the notes out into the default staging
+	// Step 3.2 stages the notes out into the default staging
 	// folder, and the run folder is deleted. The vault's _Slip_Box holds a
 	// note named like segment 2's hub, in another case.
 	hub := split.Hub(src.Segments[2])
@@ -648,10 +650,10 @@ func TestResume_SplitsTheFinalNotes(t *testing.T) {
 		t.Fatal(err)
 	}
 	stderr.Reset()
-	if code := runCommand(context.Background(), []string{"resume", "-vault", vault, runDir}, &stdout, &stderr, again); code != 1 || len(again.Calls()) != 0 {
+	if code := runCommand(context.Background(), []string{"resume", runDir}, &stdout, &stderr, again); code != 1 || len(again.Calls()) != 0 {
 		t.Fatalf("resume into an occupied staging folder: exit %d with %d calls, want 1 with none: %s", code, len(again.Calls()), stderr.String())
 	}
-	if want := "or give -staging another folder, then run s2n resume -vault " + vault + " " + runDir; !strings.Contains(stderr.String(), want) {
+	if want := "or give -staging another folder, then run s2n resume " + runDir; !strings.Contains(stderr.String(), want) {
 		t.Errorf("stderr %q does not say %q", stderr.String(), want)
 	}
 	if _, err := os.Stat(runDir); err != nil {
@@ -662,7 +664,7 @@ func TestResume_SplitsTheFinalNotes(t *testing.T) {
 	}
 
 	stderr.Reset()
-	if code := runCommand(context.Background(), []string{"resume", "-vault", vault, runDir}, &stdout, &stderr, again); code != 0 || len(again.Calls()) != 0 {
+	if code := runCommand(context.Background(), []string{"resume", runDir}, &stdout, &stderr, again); code != 0 || len(again.Calls()) != 0 {
 		t.Fatalf("resume with a vault: exit %d with %d calls, want 0 with none: %s", code, len(again.Calls()), stderr.String())
 	}
 	for _, want := range []string{"staged the notes in " + staging, "model calls cost $"} {
@@ -706,7 +708,8 @@ func TestResume_SplitsTheFinalNotes(t *testing.T) {
 	}
 }
 
-// A run given -stage-2-model or -stage-3-model is told to resume with it.
+// A run folder with no options recorded, given -stage-2-model or
+// -stage-3-model, is told to resume with it.
 func TestResumeCommand_StageModels(t *testing.T) {
 	opts := options{stage1Model: extract.DefaultModel, extractEffort: extract.DefaultEffort, repairModel: extract.DefaultModel,
 		repairReply: repair.DefaultReply, quoteOnce: quoteonce.Default, proposerModel: lossproposer.Model, stage2Model: "haiku", stage3Model: "sonnet", fiveHourUSD: usagelimit.DefaultFiveHourUSD}
@@ -719,8 +722,9 @@ func TestResumeCommand_StageModels(t *testing.T) {
 	}
 }
 
-// A run given -vault other than $S2N_VAULT, or -staging other than the
-// vault's default, is told to resume with it.
+// A run folder with no options recorded, given -vault other than
+// $S2N_VAULT, or -staging other than the vault's default, is told to resume
+// with it.
 func TestResumeCommand_VaultAndStaging(t *testing.T) {
 	opts := options{stage1Model: extract.DefaultModel, extractEffort: extract.DefaultEffort, repairModel: extract.DefaultModel,
 		repairReply: repair.DefaultReply, quoteOnce: quoteonce.Default, proposerModel: lossproposer.Model, stage2Model: split.DefaultModel, stage3Model: format.DefaultModel, fiveHourUSD: usagelimit.DefaultFiveHourUSD,
@@ -734,8 +738,8 @@ func TestResumeCommand_VaultAndStaging(t *testing.T) {
 	}
 }
 
-// A run given -proposer-model is told to resume with it, and one left at the
-// proposer's tier is not.
+// A run folder with no options recorded, given -proposer-model, is told to
+// resume with it, and one left at the proposer's tier is not.
 func TestResumeCommand_ProposerModel(t *testing.T) {
 	opts := options{stage1Model: extract.DefaultModel, extractEffort: extract.DefaultEffort, repairModel: extract.DefaultModel,
 		repairReply: repair.DefaultReply, quoteOnce: quoteonce.Default, proposerModel: "opus", stage2Model: split.DefaultModel, stage3Model: format.DefaultModel, fiveHourUSD: usagelimit.DefaultFiveHourUSD}
@@ -748,7 +752,8 @@ func TestResumeCommand_ProposerModel(t *testing.T) {
 	}
 }
 
-// A run given -keep is told to resume with it, and one not given it is not.
+// A run folder with no options recorded, given -keep, is told to resume with
+// it, and one not given it is not.
 func TestResumeCommand_Keep(t *testing.T) {
 	opts := options{stage1Model: extract.DefaultModel, extractEffort: extract.DefaultEffort, repairModel: extract.DefaultModel,
 		repairReply: repair.DefaultReply, quoteOnce: quoteonce.Default, proposerModel: lossproposer.Model, stage2Model: split.DefaultModel, stage3Model: format.DefaultModel, fiveHourUSD: usagelimit.DefaultFiveHourUSD, keep: true}

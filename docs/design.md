@@ -101,8 +101,15 @@ Each run has a **run folder** outside the vault, which is the only channel
 between steps ([ADR 0002](adr/0002-one-note-model-run-folder-and-replies-tested-as-text.md)).
 Each step writes only its own directory, and a complete directory means a
 finished step. `s2n resume` picks up at the first step that isn't complete,
-and reuses the segments that step had already finished. Package `run`
-documents the layout. A successful run deletes the folder once its notes are
+and reuses the segments that step had already finished. A run records its
+options, every flag that shapes it but `-stop-after`, at the top of its run
+folder before its first step, and a resume runs with them, so a stop's
+resume command is `s2n resume` and the run folder. A resume may change where
+the notes go and how it waits, with `-vault`, `-staging`, `-five-hour-usd`
+and `-keep`, which are recorded for the resumes after it. It may not change a
+model, an effort, a reply shape or quote-once: that would mix models within
+one run, and call again the finished segments whose requests it changes.
+Package `run` documents the layout. A successful run deletes the folder once its notes are
 staged, unless it is given `-keep`.
 
 Before that, a successful run appends one line to the **run log**,
