@@ -37,8 +37,6 @@
 //	  uncovered/<n>.txt       segment n's uncovered list for its loss proposer, if it has one
 //	  findings.json           every note's findings, the report's notes in its order, for
 //	                          the steps that read step 1.2's findings
-//	  coverage.json           the coverage totals, covered sentences out of the frame's, for
-//	                          the run report
 //	1.3a-support-check/       step 1.3a, the support and cuts check
 //	  reports/<n>.md          segment n's checker report, the reply as received
 //	  flags/<n>.json          segment n's report parsed: its flags, and its other lines kept as text
@@ -325,8 +323,6 @@ const (
 	CoverageFile = "coverage.txt"
 	UncoveredDir = "uncovered"
 	FindingsFile = "findings.json"
-	// CoverageTotalsFile holds the coverage totals for the run report.
-	CoverageTotalsFile = "coverage.json"
 )
 
 // FlagsDir holds a checker step's parsed reports, beside its reports.

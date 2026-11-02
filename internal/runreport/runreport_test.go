@@ -189,10 +189,9 @@ func TestRun_ListsRemarksAndNoFreeLines(t *testing.T) {
 		files map[string]string
 	}{
 		{run.ExtractDir, []dropped.Item{{Segment: 0, What: "a DELETE", Why: "extract"}}, nil},
-		{run.RepairDir, []dropped.Item{{Segment: 0, What: "an edit", Why: "repair"}}, nil},
-		{run.MechanicalRecheckDir, nil, map[string]string{run.CoverageTotalsFile: `{"covered":0,"total":1}`}},
+		{run.RepairDir, []dropped.Item{{Segment: 0, What: "an edit", Why: "repair"}}, map[string]string{filepath.Join(run.NotesDir, "0 One.md"): "# 0 One\n"}},
 		{run.LossProposerDir, []dropped.Item{{Segment: 0, What: lossproposer.Remark(remark), Why: lossproposer.RemarkWhy}}, map[string]string{run.ProposedLossesFile: string(union)}},
-		{run.KeptLossDir, []dropped.Item{{Segment: 0, What: "loss 0.1", Why: "kept-loss"}}, map[string]string{filepath.Join(run.KeptLossMechanicalDir, run.CoverageTotalsFile): `{"covered":0,"total":1}`}},
+		{run.KeptLossDir, []dropped.Item{{Segment: 0, What: "loss 0.1", Why: "kept-loss"}}, map[string]string{filepath.Join(run.NotesDir, "0 One.md"): "# 0 One\n"}},
 		{run.FinalDir, nil, map[string]string{filepath.Join(run.NotesDir, "0 One.md"): "# 0 One\n"}},
 	}
 	for _, st := range steps {
@@ -372,10 +371,10 @@ func commit(t *testing.T, folder *run.Folder, dir string, files map[string]strin
 
 // A run with no losses, still-fails, drops or fallbacks gives zero counts,
 // and, with no kept loss to add, step 1.2 counts the same coverage before
-// kept losses and after. Run reads the coverage from the two re-checks'
-// directories, and each model step's usage from its log, the steps in run
-// order, the loss proposer's before the kept-loss repair's, in both the run
-// folder's report and the staged copy.
+// kept losses and after. Run works out the coverage from the repaired notes
+// and the kept-loss repair's, and reads each model step's usage from its
+// log, the steps in run order, the loss proposer's before the kept-loss
+// repair's, in both the run folder's report and the staged copy.
 func TestRun_SummaryOfAQuietRun(t *testing.T) {
 	src, err := source.Parse("Tiny", "---\nsource: \"[[@Tiny]]\"\n---\n## One\n\nAlpha is first. Beta is second.\n")
 	if err != nil {
@@ -394,9 +393,6 @@ func TestRun_SummaryOfAQuietRun(t *testing.T) {
 		return out
 	}
 	commit(t, folder, run.RepairDir, staged(notes))
-	if err := mechcheck.RunOn(src, folder, run.RepairNotes, run.MechanicalRecheckDir); err != nil {
-		t.Fatal(err)
-	}
 	commit(t, folder, run.LossProposerDir, map[string]string{
 		run.ProposedLossesFile: "[]",
 		run.UsageFile:          `{"step":"1.5-loss-proposer","run":1,"model":"sonnet","effort":"medium","cost_usd":0.25,"seconds":10,"models":{"claude-sonnet-5-5":{}}}` + "\n",
@@ -404,10 +400,6 @@ func TestRun_SummaryOfAQuietRun(t *testing.T) {
 	keptLoss := staged(notes)
 	keptLoss[run.UsageFile] = `{"step":"1.4-kept-loss-repair","model":"opus","effort":"medium","cost_usd":1,"seconds":30,"models":{"claude-opus-5-5":{}}}` + "\n"
 	commit(t, folder, run.KeptLossDir, keptLoss)
-	inner := &run.Folder{Dir: filepath.Join(folder.Dir, run.KeptLossDir)}
-	if err := mechcheck.RunOn(src, inner, run.NotesDir, run.KeptLossMechanicalDir); err != nil {
-		t.Fatal(err)
-	}
 	commit(t, folder, run.FinalDir, staged(notes))
 	if err := runreport.Run(src, folder); err != nil {
 		t.Fatal(err)

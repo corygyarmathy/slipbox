@@ -17,7 +17,7 @@ What the run's model calls used, then what s2n added, dropped and still flags in
 | 3.1-format | haiku (medium): claude-haiku-5-5 | 3 | $0.12 | 20 |
 | Total |  | 15 | $3.00 | 288 |
 
-Cost is in dollars at API rates. Seconds are the calls' time added up, more than the run took when calls ran in parallel.
+Cost is in dollars at API rates. Seconds are the calls' time added up, more than the run took when calls ran in parallel. The total row adds up the steps' unrounded figures, so it can differ from the rows above by a cent or a second.
 
 ## Losses added
 
