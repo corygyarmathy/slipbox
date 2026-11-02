@@ -748,6 +748,19 @@ func TestResumeCommand_ProposerModel(t *testing.T) {
 	}
 }
 
+// A run given -keep is told to resume with it, and one not given it is not.
+func TestResumeCommand_Keep(t *testing.T) {
+	opts := options{stage1Model: extract.DefaultModel, extractEffort: extract.DefaultEffort, repairModel: extract.DefaultModel,
+		repairReply: repair.DefaultReply, quoteOnce: quoteonce.Default, proposerModel: lossproposer.Model, stage2Model: split.DefaultModel, stage3Model: format.DefaultModel, fiveHourUSD: usagelimit.DefaultFiveHourUSD, keep: true}
+	if got, want := resumeCommand(opts, "dir"), "s2n resume -keep dir"; got != want {
+		t.Errorf("resumeCommand = %q, want %q", got, want)
+	}
+	opts.keep = false
+	if got, want := resumeCommand(opts, "dir"), "s2n resume dir"; got != want {
+		t.Errorf("resumeCommand = %q, want %q", got, want)
+	}
+}
+
 // A run folder from before the run became unattended, that got past the
 // kept-loss repair, resumes:
 // its checkpoint was reviewed, its kept-loss repair wrote no still-fails

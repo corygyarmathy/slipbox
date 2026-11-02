@@ -714,6 +714,26 @@ func TestRun_GoesUnattendedToStageOut(t *testing.T) {
 	}
 }
 
+// A run given -keep that reaches step 3.2 keeps its run folder, with step
+// 3.2 complete, and says so in place of saying it is deleted.
+func TestRun_KeepKeepsTheRunFolder(t *testing.T) {
+	vault := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(vault, stageout.SlipBoxDir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runDir, _, stderr := lampRun(t, nil, "-vault", vault, "-keep")
+	folder := &run.Folder{Dir: runDir}
+	if !folder.Complete(run.StageOutDir) {
+		t.Errorf("the run folder %s is not kept with %s complete", runDir, run.StageOutDir)
+	}
+	if want := " The run folder " + runDir + " is kept.\n"; !strings.HasSuffix(stderr, want) {
+		t.Errorf("stderr %q does not end %q", stderr, want)
+	}
+	if strings.Contains(stderr, "deleted") {
+		t.Errorf("stderr %q says something is deleted", stderr)
+	}
+}
+
 // s2n run given a source that isn't valid UTF-8 stops before it makes a run
 // folder, and says which file to re-save.
 func TestRunCommand_SourceNotUTF8(t *testing.T) {

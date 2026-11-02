@@ -100,7 +100,7 @@ Each step writes only its own directory, and a complete directory means a
 finished step. `s2n resume` picks up at the first step that isn't complete,
 and reuses the segments that step had already finished. Package `run`
 documents the layout. A successful run deletes the folder once its notes are
-staged.
+staged, unless it is given `-keep`.
 
 ## Code
 

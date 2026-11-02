@@ -5,7 +5,8 @@
 //
 // with the flags -stage-1-model, -extract-effort, -repair-model,
 // -repair-reply, -quote-once, -proposer-model, -stage-2-model,
-// -stage-3-model, -five-hour-usd, -vault, -staging and -stop-after (see -h).
+// -stage-3-model, -five-hour-usd, -vault, -staging, -stop-after and -keep
+// (see -h).
 // -vault defaults to $S2N_VAULT.
 //
 // A run prints its run folder's path and runs every step, unattended, from
@@ -26,7 +27,8 @@
 // 3.2 stages the notes out into the staging folder, which defaults to
 // <vault>/Staging/<source name>/, with the name-clash list and the run report
 // beside them, and the run folder is deleted, once the run's model calls and
-// their cost are printed. A staging folder that already holds anything stops
+// their cost are printed. With -keep the run folder is kept instead, so that
+// what the run did can be read after it. A staging folder that already holds anything stops
 // the run before it writes there. A run that can reach step 3.2, with no
 // -stop-after before it, checks the vault and the staging folder before it
 // runs a step, so that a stop there comes before any model call. With
@@ -93,8 +95,8 @@ import (
 	"github.com/corygyarmathy/slipbox/internal/usagelimit"
 )
 
-const usage = "usage: s2n run [-run-dir DIR] [-stage-1-model MODEL] [-extract-effort LEVEL] [-repair-model MODEL] [-repair-reply SHAPE] [-quote-once=false] [-proposer-model MODEL] [-stage-2-model MODEL] [-stage-3-model MODEL] [-five-hour-usd USD] [-vault DIR] [-staging DIR] [-stop-after STEP] <source.md>\n" +
-	"       s2n resume [-stage-1-model MODEL] [-extract-effort LEVEL] [-repair-model MODEL] [-repair-reply SHAPE] [-quote-once=false] [-proposer-model MODEL] [-stage-2-model MODEL] [-stage-3-model MODEL] [-five-hour-usd USD] [-vault DIR] [-staging DIR] [-stop-after STEP] <run folder>"
+const usage = "usage: s2n run [-run-dir DIR] [-stage-1-model MODEL] [-extract-effort LEVEL] [-repair-model MODEL] [-repair-reply SHAPE] [-quote-once=false] [-proposer-model MODEL] [-stage-2-model MODEL] [-stage-3-model MODEL] [-five-hour-usd USD] [-vault DIR] [-staging DIR] [-stop-after STEP] [-keep] <source.md>\n" +
+	"       s2n resume [-stage-1-model MODEL] [-extract-effort LEVEL] [-repair-model MODEL] [-repair-reply SHAPE] [-quote-once=false] [-proposer-model MODEL] [-stage-2-model MODEL] [-stage-3-model MODEL] [-five-hour-usd USD] [-vault DIR] [-staging DIR] [-stop-after STEP] [-keep] <run folder>"
 
 // ExitGate is the exit code of a run a gate stopped, distinct from an error's
 // 1 and a usage error's 2. 3 was the checkpoint's, which s2n no longer has.
@@ -144,6 +146,7 @@ func runCommand(ctx context.Context, args []string, stdout, stderr io.Writer, p 
 	fs.StringVar(&opts.vault, "vault", opts.vaultDefault, "the vault step 3.2 stages the notes into, whose "+stageout.SlipBoxDir+" it reads note names from (default $"+VaultEnv+")")
 	fs.StringVar(&opts.staging, "staging", "", "step 3.2's staging folder (default <vault>/"+stageout.StagingDir+"/<source name>)")
 	fs.StringVar(&opts.stopAfter, "stop-after", "", "stop after this step, named by its directory in the run folder, such as "+run.ReadsAloneRecheckDir+", if the run reaches it")
+	fs.BoolVar(&opts.keep, "keep", false, "keep the run folder once step 3.2 has staged the notes, in place of deleting it")
 	if err := fs.Parse(args[1:]); err != nil {
 		return 2
 	}
@@ -243,11 +246,14 @@ func runCommand(ctx context.Context, args []string, stdout, stderr io.Writer, p 
 			fmt.Fprintf(stderr, "%s: the notes are staged in %s, but the run folder %s is kept, as its usage could not be added up: %v\n", name, opts.staging, folder.Dir, err)
 			return 1
 		}
-		if err := folder.Delete(); err != nil {
+		fate := "deleted"
+		if opts.keep {
+			fate = "kept"
+		} else if err := folder.Delete(); err != nil {
 			fmt.Fprintf(stderr, "%s: the notes are staged in %s, but the run folder could not be deleted: %v\n", name, opts.staging, err)
 			return 1
 		}
-		fmt.Fprintf(stderr, "%s: staged the notes in %s, with the name-clash list %s and the run report %s. The run's %d model calls cost $%.2f and took %.1f minutes, added up. The run folder %s is deleted.\n", name, opts.staging, filepath.Join(opts.staging, stageout.ClashListFile), filepath.Join(opts.staging, stageout.RunReportFile), total.Calls, total.CostUSD, total.Seconds/60, folder.Dir)
+		fmt.Fprintf(stderr, "%s: staged the notes in %s, with the name-clash list %s and the run report %s. The run's %d model calls cost $%.2f and took %.1f minutes, added up. The run folder %s is %s.\n", name, opts.staging, filepath.Join(opts.staging, stageout.ClashListFile), filepath.Join(opts.staging, stageout.RunReportFile), total.Calls, total.CostUSD, total.Seconds/60, folder.Dir, fate)
 		return 0
 	case stopped != "":
 		fmt.Fprintf(stderr, "%s: stopped after %s, as -stop-after asked. Run %s to go on.\n", name, stopped, resumeCommand(opts, folder.Dir))
@@ -318,6 +324,9 @@ func resumeCommand(opts options, dir string) string {
 	}
 	if opts.staging != "" && opts.staging != stageout.DefaultStaging(opts.vault, opts.sourceName) {
 		args = append(args, "-staging", opts.staging)
+	}
+	if opts.keep {
+		args = append(args, "-keep")
 	}
 	return strings.Join(append(args, dir), " ")
 }
@@ -398,6 +407,8 @@ type options struct {
 	vault, vaultDefault, staging, sourceName string
 	// stopAfter names the step after which the run stops, or is "".
 	stopAfter string
+	// keep keeps the run folder once the run has succeeded.
+	keep bool
 }
 
 func joinReplies() string {

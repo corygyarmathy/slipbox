@@ -165,7 +165,8 @@
 //	  name-clashes.md         a copy of the staging folder's name-clash list
 //
 // Once step 3.2 is complete the run has succeeded, and its run folder is
-// deleted. A run stopped earlier, by a gate, an error or -stop-after, keeps it.
+// deleted, unless the run was given -keep. A run stopped earlier, by a gate,
+// an error or -stop-after, keeps it.
 package run
 
 import (
@@ -272,7 +273,8 @@ const RunReportFile = "report.md"
 
 // StagedReportFile is the run report that step 3.2 stages, in the run
 // report's directory. It names the notes in place of linking them, since a
-// successful run deletes the run folder its links point into.
+// successful run deletes the run folder its links point into, unless it was
+// given -keep.
 const StagedReportFile = "staged-report.md"
 
 // Names inside a model step's directory.
@@ -380,7 +382,7 @@ func Open(dir string) (*Folder, error) {
 	return f, nil
 }
 
-// Delete deletes the run folder, once the run has succeeded.
+// Delete deletes the run folder, once the run has succeeded without -keep.
 func (f *Folder) Delete() error {
 	return os.RemoveAll(f.Dir)
 }
