@@ -5,7 +5,7 @@
 - **Related Artefacts:**
     - Builds on: [ADR 0001](0001-a-standalone-go-cli-in-its-own-repository.md)
     - Design: [`docs/design.md`](../design.md)
-    - History: amended when the checkpoint was removed ([#104](https://github.com/corygyarmathy/source-to-notes/issues/104) (private)), when a resume began reusing finished segments ([#116](https://github.com/corygyarmathy/source-to-notes/issues/116) (private)), when stages 2–3 began falling back ([#123](https://github.com/corygyarmathy/source-to-notes/issues/123) (private)), when the note model's forms were named for what they do ([#157](https://github.com/corygyarmathy/source-to-notes/issues/157) (private)), when the references' recorded output was deleted from the fixture tree ([#159](https://github.com/corygyarmathy/source-to-notes/issues/159) (private)), when the trial chapters and their runs were deleted from it ([#171](https://github.com/corygyarmathy/source-to-notes/issues/171) (private)), and when tests stopped checking against a recorded run and began testing replies as text ([#11](https://github.com/corygyarmathy/slipbox/issues/11)). All seven are folded in.
+    - History: amended when the checkpoint was removed ([#104](https://github.com/corygyarmathy/source-to-notes/issues/104) (private)), when a resume began reusing finished segments ([#116](https://github.com/corygyarmathy/source-to-notes/issues/116) (private)), when stages 2–3 began falling back ([#123](https://github.com/corygyarmathy/source-to-notes/issues/123) (private)), when the note model's forms were named for what they do ([#157](https://github.com/corygyarmathy/source-to-notes/issues/157) (private)), when the references' recorded output was deleted from the fixture tree ([#159](https://github.com/corygyarmathy/source-to-notes/issues/159) (private)), when the trial chapters and their runs were deleted from it ([#171](https://github.com/corygyarmathy/source-to-notes/issues/171) (private)), when tests stopped checking against a recorded run and began testing replies as text ([#11](https://github.com/corygyarmathy/slipbox/issues/11)), and when a run began recording its options in its run folder ([#40](https://github.com/corygyarmathy/slipbox/issues/40)). All eight are folded in.
 
 ## Context
 
@@ -29,6 +29,8 @@ The build was cut into tickets, one step or gate each, each accepted when its po
 
     Tests open golden files, and anything else under `testdata/`, only through one helper package. A reply case or golden file is invented, or trimmed from a run on a public-domain source. The ports were proven on their references' recorded output, and the references and that output were then deleted, so s2n's tests and package docs are the only statement of what it does. The trial chapters, the runs made from them, the references and their output are copyrighted or quote what is, so none is in this repository, and git history in the private archive holds them ([ADR 0001](0001-a-standalone-go-cli-in-its-own-repository.md) §8). A recorded run on a public-domain chapter served the tests until they were migrated off it, and was then deleted.
 
+9. **A run's options are part of its run folder.** A run records every flag that shapes it, but `-stop-after`, which applies to one command only, at the top of its run folder before its first step, and `s2n resume` runs with them. A resume may change the vault, the staging folder, the 5-hour limit's dollars and `-keep`, and records the change. It may not change a model, an effort, a reply shape or quote-once: that would mix models within one run, and change the request of every finished segment of a partial step, so §6 would call them again. A run folder made before runs recorded their options resumes from the flags it is given.
+
 ## Consequences
 
 **Positive**
@@ -36,6 +38,7 @@ The build was cut into tickets, one step or gate each, each accepted when its po
 - A note-format fix is made once and reaches every gate.
 - A port's proof needed no judgement: its report equalled the recorded output, or it didn't.
 - A stopped run picks up where it stopped. A reply whose inputs changed, through a hand edit or a new brief, is called again.
+- A resume needs no flag from the run it resumes, so one typed by hand can't fall back to the defaults part-way through a run.
 - A change to a brief, a default, prompt assembly or a step's output breaks only the tests that assert on it, and they say what changed. None needs a paid re-run to fix.
 
 **Negative**
@@ -51,6 +54,7 @@ The build was cut into tickets, one step or gate each, each accepted when its po
 - **Port each check with its own parsing.** Rejected: four parsers to keep in step.
 - **Hold the run in memory, or in one state file.** Rejected: a stop has to leave its evidence on disk, and a resume has to read it.
 - **Compare a port to its reference on parsed findings.** Rejected: it needs a parser of each reference's output, and a judgement per check.
+- **Have a stop print each flag the run was given, and a resume read none.** Tried, and replaced: a resume typed by hand without them ran the rest of the run on the defaults, mixing models within it.
 - **Copy each brief into the package that sends it.** Rejected: embedding leaves nothing to drift.
 - **Test against a recorded run, request hashes and every file it wrote included.** Tried, and rejected: a change to a brief, a default model or effort, prompt assembly, or how any step writes what later steps build their prompts from, broke the tests, and fixing them took a paid re-run of the whole chapter. A failed hash didn't say what changed, and a byte-for-byte match said nothing about whether the notes were good.
 - **Record s2n's own outputs on the trial runs as the new reference.** Rejected: it's a recorded run by another name, with the same costs, for checks simple enough to test on reply cases.

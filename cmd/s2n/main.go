@@ -51,9 +51,22 @@
 // whose reset time can't be read stops the run with exit status 1.
 //
 // Resume picks a run folder up where it stopped: it runs the first step whose
-// directory isn't complete, and every step after it. It reads no flag's
-// choice from the run folder, so it needs the run's flags again: the resume
-// command a stop prints names each one given a value other than its default.
+// directory isn't complete, and every step after it. It runs with the
+// options the run recorded in its run folder before its first step, every
+// flag but -stop-after, so the resume command a stop prints is s2n resume
+// and the run folder alone. The vault is recorded as the run found it, from
+// -vault or $S2N_VAULT, and the staging folder only if it was given, so that
+// a resume given another vault stages under it. Of the flags a resume is
+// given, -vault, -staging, -five-hour-usd and -keep replace the recorded
+// value, and are recorded in its place for later resumes, and -stop-after
+// applies to that resume alone. The rest, the models, -extract-effort,
+// -repair-reply and -quote-once, are fixed: changing one part-way would mix
+// models within one run, and call again every finished segment of a partial
+// step, as it changes their requests. A resume given one with a value other
+// than the recorded one is a usage error. A run folder made before runs
+// recorded their options resumes from the flags it is given, or their
+// defaults, and the resume command a stop prints for it names each one given
+// a value other than its default.
 //
 // A gate that stops the run, for a fault with nothing to fall back to, such
 // as a segment folder no segment claims, exits 4, naming the gate, the
@@ -66,10 +79,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	iofs "io/fs"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -189,9 +204,18 @@ func runCommand(ctx context.Context, args []string, stdout, stderr io.Writer, p 
 		err    error
 	)
 	if args[0] == "run" {
-		folder, src, err = newRun(fs.Arg(0), *runDir, stdout)
+		if folder, src, err = newRun(fs.Arg(0), *runDir, stdout); err == nil {
+			err = writeOptions(folder, &opts)
+		}
 	} else if folder, src, err = openRun(fs.Arg(0)); err == nil {
-		err = folder.ClearStopped()
+		if err = readOptions(folder, fs, &opts); err == nil {
+			err = folder.ClearStopped()
+		}
+	}
+	var fixed *fixedFlag
+	if errors.As(err, &fixed) {
+		fmt.Fprintf(stderr, "%s: %v\n", name, err)
+		return 2
 	}
 	var sourceNotUTF8 *source.NotUTF8
 	if args[0] == "run" && errors.As(err, &sourceNotUTF8) {
@@ -316,11 +340,16 @@ func stopSummary(name string, e *gate.Stopped, resume string) string {
 	return fmt.Sprintf("%s: %v. Then run %s.\n", name, e, resume)
 }
 
-// resumeCommand is the command that resumes the run in dir with opts, but
-// for -stop-after: resume reads no choice from the run folder, so it names
-// each flag given a value other than its default.
+// resumeCommand is the command that resumes the run in dir with opts. A
+// resume reads the run's options from its run folder, so it names no flag.
+// A run folder made before runs recorded their options has none to read, so
+// for it the command names each flag given a value other than its default,
+// but for -stop-after.
 func resumeCommand(opts options, dir string) string {
 	args := []string{"s2n", "resume"}
+	if opts.recorded {
+		return strings.Join(append(args, dir), " ")
+	}
 	if opts.stage1Model != extract.DefaultModel {
 		args = append(args, "-stage-1-model", opts.stage1Model)
 	}
@@ -438,6 +467,142 @@ type options struct {
 	stopAfter string
 	// keep keeps the run folder once the run has succeeded.
 	keep bool
+	// recorded says the run folder holds the options, so that a resume
+	// reads them.
+	recorded bool
+}
+
+// storedOptions are a run's options as its run folder's run.OptionsFile
+// keeps them: every flag that shapes the run, but -stop-after, which applies
+// to one command only. Vault is the vault in effect, from -vault or
+// $S2N_VAULT, and Vault and Staging are absolute, so that a resume from
+// another directory finds the same folders. Staging is "" when it defaults
+// from the vault, so that a resume given another vault stages under that.
+type storedOptions struct {
+	Stage1Model   string  `json:"stage_1_model"`
+	ExtractEffort string  `json:"extract_effort"`
+	RepairModel   string  `json:"repair_model"`
+	RepairReply   string  `json:"repair_reply"`
+	QuoteOnce     bool    `json:"quote_once"`
+	ProposerModel string  `json:"proposer_model"`
+	Stage2Model   string  `json:"stage_2_model"`
+	Stage3Model   string  `json:"stage_3_model"`
+	FiveHourUSD   float64 `json:"five_hour_usd"`
+	Vault         string  `json:"vault"`
+	Staging       string  `json:"staging"`
+	Keep          bool    `json:"keep"`
+}
+
+// writeOptions writes opts, before the staging folder is defaulted, to
+// folder's options file, and marks them recorded.
+func writeOptions(folder *run.Folder, opts *options) error {
+	s := storedOptions{
+		Stage1Model:   opts.stage1Model,
+		ExtractEffort: opts.extractEffort,
+		RepairModel:   opts.repairModel,
+		RepairReply:   string(opts.repairReply),
+		QuoteOnce:     opts.quoteOnce,
+		ProposerModel: opts.proposerModel,
+		Stage2Model:   opts.stage2Model,
+		Stage3Model:   opts.stage3Model,
+		FiveHourUSD:   opts.fiveHourUSD,
+		Keep:          opts.keep,
+	}
+	var err error
+	if s.Vault, err = absPath(opts.vault); err != nil {
+		return err
+	}
+	if s.Staging, err = absPath(opts.staging); err != nil {
+		return err
+	}
+	b, err := json.MarshalIndent(s, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := folder.WriteOptions(append(b, '\n')); err != nil {
+		return fmt.Errorf("the run's options could not be written: %w", err)
+	}
+	opts.recorded = true
+	return nil
+}
+
+// absPath is path made absolute, or "" for "".
+func absPath(path string) (string, error) {
+	if path == "" {
+		return "", nil
+	}
+	return filepath.Abs(path)
+}
+
+// readOptions sets opts, a resume's, to the options folder records, then
+// writes them back, so that a later resume keeps any it was given. Of the
+// flags given to fs, -vault, -staging, -five-hour-usd and -keep replace the
+// recorded value, and -stop-after applies to this resume alone. The rest
+// are fixed: a model, effort, reply shape or quote-once changed part-way
+// would mix models within one run, and call again every finished segment of
+// a partial step. One given a value other than the recorded one is a
+// *fixedFlag. A vault recorded as "" takes $S2N_VAULT's, as the stop with no
+// vault says. A run folder with no options file leaves opts as the flags gave
+// them.
+func readOptions(folder *run.Folder, fs *flag.FlagSet, opts *options) error {
+	b, err := folder.ReadOptions()
+	if errors.Is(err, iofs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var s storedOptions
+	if err := json.Unmarshal(b, &s); err != nil {
+		return fmt.Errorf("the run's options %s: %w", folder.OptionsPath(), err)
+	}
+	fixed := map[string]string{
+		"stage-1-model":  s.Stage1Model,
+		"extract-effort": s.ExtractEffort,
+		"repair-model":   s.RepairModel,
+		"repair-reply":   s.RepairReply,
+		"quote-once":     strconv.FormatBool(s.QuoteOnce),
+		"proposer-model": s.ProposerModel,
+		"stage-2-model":  s.Stage2Model,
+		"stage-3-model":  s.Stage3Model,
+	}
+	given := map[string]bool{}
+	var changed *fixedFlag
+	fs.Visit(func(f *flag.Flag) {
+		given[f.Name] = true
+		if want, ok := fixed[f.Name]; ok && changed == nil && f.Value.String() != want {
+			changed = &fixedFlag{name: f.Name, recorded: want, given: f.Value.String()}
+		}
+	})
+	if changed != nil {
+		return changed
+	}
+	opts.stage1Model, opts.extractEffort = s.Stage1Model, s.ExtractEffort
+	opts.repairModel, opts.repairReply = s.RepairModel, repair.Reply(s.RepairReply)
+	opts.quoteOnce, opts.proposerModel = s.QuoteOnce, s.ProposerModel
+	opts.stage2Model, opts.stage3Model = s.Stage2Model, s.Stage3Model
+	if !given["five-hour-usd"] {
+		opts.fiveHourUSD = s.FiveHourUSD
+	}
+	if !given["vault"] && s.Vault != "" {
+		opts.vault = s.Vault
+	}
+	if !given["staging"] {
+		opts.staging = s.Staging
+	}
+	if !given["keep"] {
+		opts.keep = s.Keep
+	}
+	return writeOptions(folder, opts)
+}
+
+// fixedFlag is a resume given a fixed flag with a value other than the run's.
+type fixedFlag struct {
+	name, recorded, given string
+}
+
+func (e *fixedFlag) Error() string {
+	return fmt.Sprintf("the run was run with -%s %s, and a resume can't change it to %s, as changing it part-way would mix models within one run. Resume without -%s, or start a new run with s2n run", e.name, e.recorded, e.given, e.name)
 }
 
 func joinReplies() string {

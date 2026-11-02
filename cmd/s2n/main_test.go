@@ -375,16 +375,15 @@ func TestRunCommand_RepairConfiguration(t *testing.T) {
 }
 
 // -proposer-model sets the model of both of step 1.5's runs. Each 1.5 line
-// in the usage log records it, and the way on names it. With no flag, step
-// 1.5 asks for its tier, Sonnet.
+// in the usage log records it, and the way on names no flag, as the run
+// folder records it. With no flag, step 1.5 asks for its tier, Sonnet.
 func TestRunCommand_ProposerModel(t *testing.T) {
 	for _, tc := range []struct {
 		name, model string
 		flags       []string
-		way         string
 	}{
-		{"default", lossproposer.Model, nil, "s2n resume "},
-		{"opus", "opus", []string{"-proposer-model", "opus"}, "s2n resume -proposer-model opus "},
+		{"default", lossproposer.Model, nil},
+		{"opus", "opus", []string{"-proposer-model", "opus"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			runDir, p, stderr := lampRun(t, nil, append([]string{"-stop-after", run.LossProposerDir}, tc.flags...)...)
@@ -407,7 +406,7 @@ func TestRunCommand_ProposerModel(t *testing.T) {
 					t.Errorf("usage line does not record %s: %s", tc.model, l)
 				}
 			}
-			if want := "Run " + tc.way + runDir + " to go on."; !strings.Contains(stderr, want) {
+			if want := "Run s2n resume " + runDir + " to go on."; !strings.Contains(stderr, want) {
 				t.Errorf("stderr %q does not say %q", stderr, want)
 			}
 		})
@@ -509,8 +508,8 @@ func TestRunCommand_Usage(t *testing.T) {
 // quote-once, and writes its notes as the reply gives them, footnotes and
 // all. Step 1.4 is briefed by the traced edit-shaped brief, or with
 // -repair-reply whole by the whole-notes brief, at the model -repair-model
-// names, and the way on names every flag, since resume reads none from the
-// run folder.
+// names, and the way on names no flag, since resume reads them from the run
+// folder.
 func TestRunCommand_QuoteOnceOff(t *testing.T) {
 	dir := t.TempDir()
 	sourcePath := filepath.Join(dir, "Tiny.md")
@@ -534,20 +533,18 @@ func TestRunCommand_QuoteOnceOff(t *testing.T) {
 	for _, tc := range []struct {
 		name, reply string
 		flags       []string
-		way, brief  string
+		brief       string
 	}{
 		{
 			"edits",
 			"=== EDIT: " + name + " ===\n--- REPLACE ---\nBeta is the second.[^2]\n--- WITH ---\nBeta is second.[^1]\n[^1]: [[Tiny#Alpha]] \"Beta is second.\"\n=== REPORT ===\nBeta's statement now reads as the source does.\n",
 			nil,
-			"-repair-model sonnet -quote-once=false",
 			"repair-edits.md",
 		},
 		{
 			"whole",
 			"=== FILE: " + name + " ===\n" + repaired.Render() + "=== REPORT ===\nBeta's statement now reads as the source does.\n",
 			[]string{"-repair-reply", "whole"},
-			"-repair-model sonnet -repair-reply whole -quote-once=false",
 			"repair.md",
 		},
 	} {
@@ -572,7 +569,7 @@ func TestRunCommand_QuoteOnceOff(t *testing.T) {
 			if code := runCommand(context.Background(), append(args, sourcePath), &stdout, &stderr, p); code != 0 {
 				t.Fatalf("exit %d, want 0: %s", code, stderr.String())
 			}
-			if want := "Run s2n resume " + tc.way + " " + runDir + " to go on."; !strings.Contains(stderr.String(), want) {
+			if want := "Run s2n resume " + runDir + " to go on."; !strings.Contains(stderr.String(), want) {
 				t.Errorf("stderr %q does not say %q", stderr.String(), want)
 			}
 			calls := p.Calls()

@@ -111,7 +111,8 @@ func TestResume_TakesTheLatestReadingFromTheUsageLogs(t *testing.T) {
 	}
 }
 
-// Ctrl-C stops the run with the command that resumes it.
+// Ctrl-C stops the run with the command that resumes it, which names no
+// flag, -five-hour-usd included, as the run folder records them.
 func TestRun_InterruptedSaysHowToResume(t *testing.T) {
 	sourcePath := lampSourcePath(t)
 	runDir := filepath.Join(t.TempDir(), "run")
@@ -121,7 +122,7 @@ func TestRun_InterruptedSaysHowToResume(t *testing.T) {
 	if code := runCommand(ctx, []string{"run", "-run-dir", runDir, "-five-hour-usd", "35", "-stop-after", run.ExtractDir, sourcePath}, &stdout, &stderr, refuse{}); code != 1 {
 		t.Fatalf("exit %d, want 1: %s", code, stderr.String())
 	}
-	if want := "s2n run: interrupted. Run s2n resume -five-hour-usd 35 " + runDir + " to go on.\n"; !strings.HasSuffix(stderr.String(), want) {
+	if want := "s2n run: interrupted. Run s2n resume " + runDir + " to go on.\n"; !strings.HasSuffix(stderr.String(), want) {
 		t.Errorf("stderr = %q, want it to end %q", stderr.String(), want)
 	}
 }
