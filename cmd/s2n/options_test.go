@@ -74,13 +74,14 @@ func TestRun_RecordsItsOptions(t *testing.T) {
 // flags on the models it was given: each resumed step's requests name its
 // recorded model.
 func TestResume_UsesTheRecordedModels(t *testing.T) {
+	useState(t)
 	runDir, _, stderr := lampRun(t, lampEveryStep(), "-stage-1-model", "sonnet", "-repair-model", "haiku", "-proposer-model", "opus",
-		"-stage-2-model", "haiku", "-stage-3-model", "sonnet", "-stop-after", run.ExtractDir)
+		"-stage-2-model", "haiku", "-stage-3-model", "sonnet", "-vault", emptyVault(t), "-stop-after", run.ExtractDir)
 	if want := "Run s2n resume " + runDir + " to go on."; !strings.Contains(stderr, want) {
 		t.Errorf("stderr %q does not say %q", stderr, want)
 	}
 	p := lampModel(t, runDir, lampEveryStep())
-	if code, stderr := resumeWith(t, p, runDir, "-stop-after", run.FormatGateDir); code != 0 {
+	if code, stderr := resumeWith(t, p, runDir); code != 0 {
 		t.Fatalf("resume: exit %d, want 0: %s", code, stderr)
 	}
 	for step, model := range map[string]string{
@@ -137,23 +138,36 @@ func TestResume_RefusesAChangedModel(t *testing.T) {
 
 // A resume given -vault stages in that vault, and records it, so that a
 // later resume with no flags stages there too. The staging folder, left to
-// default, follows the new vault.
+// default, follows the new vault. The first resume finds the new vault's
+// staging folder occupied, so that it stops before staging and leaves a
+// later resume to do it.
 func TestResume_KeepsANewVault(t *testing.T) {
 	useState(t)
 	old, vault := emptyVault(t), emptyVault(t)
+	src := testfixture.LampSource(t)
+	staging := stageout.DefaultStaging(vault, src.Name)
+	occupant := filepath.Join(staging, "occupant.md")
+	if err := os.MkdirAll(staging, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(occupant, []byte("here first\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	runDir, _, _ := lampRun(t, nil, "-vault", old, "-stop-after", run.FormatGateDir)
-	if code, stderr := resumeWith(t, testfixture.Serve(t), runDir, "-vault", vault, "-stop-after", run.FormatGateDir); code != 0 {
-		t.Fatalf("resume with a new vault: exit %d, want 0: %s", code, stderr)
+	code, stderr := resumeWith(t, testfixture.Serve(t), runDir, "-vault", vault)
+	if want := "the staging folder " + staging + " already holds occupant.md"; code != 1 || !strings.Contains(stderr, want) {
+		t.Fatalf("resume with a new vault: exit %d, want 1 saying %q: %s", code, want, stderr)
 	}
 	if got := readStored(t, runDir).Vault; got != vault {
 		t.Errorf("recorded vault %q, want the new %q", got, vault)
 	}
-	code, stderr := resumeWith(t, testfixture.Serve(t), runDir)
+	if err := os.Remove(occupant); err != nil {
+		t.Fatal(err)
+	}
+	code, stderr = resumeWith(t, testfixture.Serve(t), runDir)
 	if code != 0 {
 		t.Fatalf("resume with no flags: exit %d, want 0: %s", code, stderr)
 	}
-	src := testfixture.LampSource(t)
-	staging := stageout.DefaultStaging(vault, src.Name)
 	if want := "staged the notes in " + staging; !strings.Contains(stderr, want) {
 		t.Errorf("stderr %q does not say %q", stderr, want)
 	}
@@ -162,6 +176,91 @@ func TestResume_KeepsANewVault(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(old, stageout.StagingDir)); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("the old vault was staged into (stat: %v)", err)
+	}
+}
+
+// A resume given -staging, -five-hour-usd or -keep records it in place of
+// the run's value, and a later resume not given it keeps the recorded one.
+func TestResume_RecordsTheFlagsItMayChange(t *testing.T) {
+	runDir := lampAt(t, run.ExtractDir)
+	staging := filepath.Join(t.TempDir(), "staging")
+	if code, stderr := resumeWith(t, testfixture.Serve(t), runDir, "-staging", staging, "-five-hour-usd", "20", "-keep", "-stop-after", run.ExtractDir); code != 0 {
+		t.Fatalf("resume: exit %d, want 0: %s", code, stderr)
+	}
+	want := readStored(t, runDir)
+	if want.Staging != staging || want.FiveHourUSD != 20 || !want.Keep {
+		t.Fatalf("recorded staging %q, five-hour-usd %v, keep %t, want %q, 20, true", want.Staging, want.FiveHourUSD, want.Keep, staging)
+	}
+	if code, stderr := resumeWith(t, testfixture.Serve(t), runDir, "-stop-after", run.ExtractDir); code != 0 {
+		t.Fatalf("resume with no flags: exit %d, want 0: %s", code, stderr)
+	}
+	if got := readStored(t, runDir); got != want {
+		t.Errorf("a resume with no flags recorded %+v, want %+v as before", got, want)
+	}
+}
+
+// A resume given -repair-model "", which stands for the stage 1 model, is
+// given the recorded repair model when the run's repair model was its stage
+// 1 model, so it is accepted, though the default -stage-1-model differs.
+func TestResume_AcceptsAnEmptyRepairModel(t *testing.T) {
+	runDir, _, _ := lampRun(t, nil, "-stage-1-model", "sonnet", "-stop-after", run.ExtractDir)
+	if code, stderr := resumeWith(t, testfixture.Serve(t), runDir, "-repair-model", "", "-stop-after", run.ExtractDir); code != 0 {
+		t.Errorf("resume with -repair-model \"\": exit %d, want 0: %s", code, stderr)
+	}
+}
+
+// A run folder whose options file isn't JSON stops the resume, naming the
+// file, before any model call.
+func TestResume_UnreadableOptions(t *testing.T) {
+	runDir := lampAt(t, run.ExtractDir)
+	options := filepath.Join(runDir, run.OptionsFile)
+	if err := os.WriteFile(options, []byte("{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p := testfixture.Serve(t)
+	code, stderr := resumeWith(t, p, runDir)
+	if code != 1 || len(p.Calls()) != 0 {
+		t.Fatalf("resume: exit %d with %d calls, want 1 with none: %s", code, len(p.Calls()), stderr)
+	}
+	if !strings.Contains(stderr, options) {
+		t.Errorf("stderr %q does not name %s", stderr, options)
+	}
+}
+
+// Every flag of s2n run is recorded, but -run-dir, which names the run
+// folder the options are in, and -stop-after, which applies to one command
+// only, so that a flag added later can't be left out of the record and a
+// resume run it on its default.
+func TestRun_RecordsEveryFlag(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := runCommand(context.Background(), []string{"run", "-h"}, &stdout, &stderr, testfixture.Serve(t)); code != 2 {
+		t.Fatalf("s2n run -h: exit %d, want 2: %s", code, stderr.String())
+	}
+	runDir := lampAt(t, run.ExtractDir)
+	b, err := os.ReadFile(filepath.Join(runDir, run.OptionsFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var recorded map[string]any
+	if err := json.Unmarshal(b, &recorded); err != nil {
+		t.Fatal(err)
+	}
+	var flags int
+	for line := range strings.Lines(stderr.String()) {
+		name, ok := strings.CutPrefix(line, "  -")
+		if !ok {
+			continue
+		}
+		name, _, _ = strings.Cut(strings.TrimSpace(name), " ")
+		if flags++; name == "run-dir" || name == "stop-after" {
+			continue
+		}
+		if _, ok := recorded[strings.ReplaceAll(name, "-", "_")]; !ok {
+			t.Errorf("-%s is not recorded in %s", name, run.OptionsFile)
+		}
+	}
+	if flags == 0 {
+		t.Fatalf("s2n run -h names no flag: %s", stderr.String())
 	}
 }
 

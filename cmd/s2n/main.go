@@ -78,6 +78,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -190,9 +191,6 @@ func runCommand(ctx context.Context, args []string, stdout, stderr io.Writer, p 
 		fmt.Fprintf(stderr, "%s: -five-hour-usd %v is not a positive number of dollars\n", name, opts.fiveHourUSD)
 		return 2
 	}
-	if opts.repairModel == "" {
-		opts.repairModel = opts.stage1Model
-	}
 	if dirs := stepDirs(); opts.stopAfter != "" && !slices.Contains(dirs, opts.stopAfter) {
 		fmt.Fprintf(stderr, "%s: -stop-after %q is not a step; the steps are %s\n", name, opts.stopAfter, strings.Join(dirs, ", "))
 		return 2
@@ -211,6 +209,9 @@ func runCommand(ctx context.Context, args []string, stdout, stderr io.Writer, p 
 		if err = readOptions(folder, fs, &opts); err == nil {
 			err = folder.ClearStopped()
 		}
+	}
+	if opts.repairModel == "" {
+		opts.repairModel = opts.stage1Model
 	}
 	var fixed *fixedFlag
 	if errors.As(err, &fixed) {
@@ -494,12 +495,13 @@ type storedOptions struct {
 }
 
 // writeOptions writes opts, before the staging folder is defaulted, to
-// folder's options file, and marks them recorded.
+// folder's options file, and marks them recorded. A -repair-model of "" is
+// recorded as the stage 1 model it stands for.
 func writeOptions(folder *run.Folder, opts *options) error {
 	s := storedOptions{
 		Stage1Model:   opts.stage1Model,
 		ExtractEffort: opts.extractEffort,
-		RepairModel:   opts.repairModel,
+		RepairModel:   cmp.Or(opts.repairModel, opts.stage1Model),
 		RepairReply:   string(opts.repairReply),
 		QuoteOnce:     opts.quoteOnce,
 		ProposerModel: opts.proposerModel,
@@ -570,8 +572,14 @@ func readOptions(folder *run.Folder, fs *flag.FlagSet, opts *options) error {
 	var changed *fixedFlag
 	fs.Visit(func(f *flag.Flag) {
 		given[f.Name] = true
-		if want, ok := fixed[f.Name]; ok && changed == nil && f.Value.String() != want {
-			changed = &fixedFlag{name: f.Name, recorded: want, given: f.Value.String()}
+		v := f.Value.String()
+		if f.Name == "repair-model" {
+			// -repair-model "" stands for the run's stage 1 model, which is
+			// the recorded one, as -stage-1-model is fixed too.
+			v = cmp.Or(v, s.Stage1Model)
+		}
+		if want, ok := fixed[f.Name]; ok && changed == nil && v != want {
+			changed = &fixedFlag{name: f.Name, recorded: want, given: v}
 		}
 	})
 	if changed != nil {

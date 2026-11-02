@@ -17,11 +17,15 @@
 //	source/<source name>.md   the source as the run read it
 //	OPTIONS.json              every flag that shapes the run, as it is run, which
 //	                          `s2n resume` reads in place of the flags and writes
-//	                          back with the ones it may change (package main says
-//	                          which)
+//	                          back with the ones it may change
 //
-// A run folder made before runs recorded their options has no OPTIONS.json,
-// and resumes from the flags it is given.
+// A resume may change where the notes go and how it waits, -vault, -staging,
+// -five-hour-usd and -keep, and records the change for the resumes after it.
+// The models, -extract-effort, -repair-reply and -quote-once are fixed:
+// changing one part-way would mix models within one run, and call again every
+// finished segment of a partial step whose request it changes. A run folder
+// made before runs recorded their options has no OPTIONS.json, and resumes
+// from the flags it is given.
 //
 // A run a gate stopped has, at the top of its folder, a summary of the stop
 // for the human: no step reads it, and `s2n resume` removes it when it

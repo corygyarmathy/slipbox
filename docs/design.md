@@ -109,8 +109,8 @@ the notes go and how it waits, with `-vault`, `-staging`, `-five-hour-usd`
 and `-keep`, which are recorded for the resumes after it. It may not change a
 model, an effort, a reply shape or quote-once: that would mix models within
 one run, and call again the finished segments whose requests it changes.
-Package `run` documents the layout. A successful run deletes the folder once its notes are
-staged, unless it is given `-keep`.
+Package `run` documents the layout. A successful run deletes the folder once
+its notes are staged, unless it is given `-keep`.
 
 Before that, a successful run appends one line to the **run log**,
 `run-log.jsonl` in `$XDG_STATE_HOME/s2n/` (`~/.local/state/s2n/` when the
