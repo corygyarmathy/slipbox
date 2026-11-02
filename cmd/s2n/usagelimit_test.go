@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -16,15 +17,25 @@ import (
 	"github.com/corygyarmathy/slipbox/internal/usagelimit"
 )
 
-// TestMain keeps every test off the network and off the wall clock: the
-// account's usage is a reading with room, taken before any a test's run
-// folder holds, and the gate's clock doesn't sleep.
+// TestMain keeps every test off the network, off the wall clock and out of
+// the real state directory: the account's usage is a reading with room,
+// taken before any a test's run folder holds, the gate's clock doesn't
+// sleep, and $XDG_STATE_HOME, where every run that succeeds appends to the
+// run log, is a temporary directory.
 func TestMain(m *testing.M) {
+	state, err := os.MkdirTemp("", "s2n-state-")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	os.Setenv("XDG_STATE_HOME", state)
 	accountUsage = func(context.Context) (*provider.Reading, error) {
 		return &provider.Reading{Limits: map[string]provider.Limit{provider.FiveHour: {}}}, nil
 	}
 	clock = &fakeClock{now: time.Now()}
-	os.Exit(m.Run())
+	code := m.Run()
+	os.RemoveAll(state)
+	os.Exit(code)
 }
 
 // fakeClock is a usagelimit.Clock whose Wait moves the time on at once and

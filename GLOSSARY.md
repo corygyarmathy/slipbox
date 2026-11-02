@@ -144,6 +144,10 @@ _Avoid_: validator, guard
 A run's working files, kept outside the vault: each step's traced notes, reports and replies. A stopped run resumes from it.
 _Avoid_: workspace, temp dir
 
+**Run log**:
+One JSON line per run that completed step 3.2, appended in s2n's state directory, outside any run folder: the run report's summary, with the source's name, the run folder's path and when the run finished. It outlives the run folders, which a successful run deletes, so runs can be compared. A run that stops appends nothing.
+_Avoid_: history, ledger, usage log (a step's record of its calls)
+
 **Usage limit**:
 The model plan's cap on use over a period, a session or a week, after which the provider refuses calls until it resets. A call refused for it was never answered: it is waited out, not retried.
 _Avoid_: window, quota, capacity
