@@ -192,3 +192,47 @@ func TestRun_RunLogNotWritten(t *testing.T) {
 		t.Errorf("the resume changed the staging folder: %q, was %q", keys(got), keys(staged))
 	}
 }
+
+// A run whose line is appended to the run log but that the run folder can't
+// keep, here as its LOGGED.json is a link to nowhere, has succeeded: it says
+// so, exits 0 and deletes the run folder.
+func TestResume_RunLogLineNotKept(t *testing.T) {
+	logPath := useState(t)
+	runDir := lampAt(t, run.FormatGateDir)
+	folder := &run.Folder{Dir: runDir}
+	if err := os.Symlink(filepath.Join(t.TempDir(), "gone", "LOGGED.json"), folder.LoggedPath()); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := runCommand(context.Background(), []string{"resume", "-vault", emptyVault(t), runDir}, &stdout, &stderr, testfixture.Serve(t)); code != 0 {
+		t.Fatalf("exit %d, want 0: %s", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "the line is appended to "+logPath) {
+		t.Errorf("stderr %q does not say the line is appended", stderr.String())
+	}
+	if lines := logLines(t, logPath); len(lines) != 1 {
+		t.Errorf("the run log has %d lines, want 1: %q", len(lines), lines)
+	}
+	if _, err := os.Stat(runDir); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("the run folder is not deleted (stat: %v)", err)
+	}
+}
+
+// A run that can reach step 3.2 but can't work out the run log's path, with
+// neither $XDG_STATE_HOME nor $HOME set, stops before any model call.
+func TestRun_NoStateDirectory(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", "")
+	t.Setenv("HOME", "")
+	runDir := filepath.Join(t.TempDir(), "run")
+	p := lampModel(t, runDir, nil)
+	var stdout, stderr bytes.Buffer
+	if code := runCommand(context.Background(), []string{"run", "-run-dir", runDir, "-vault", emptyVault(t), lampSourcePath(t)}, &stdout, &stderr, p); code != 1 {
+		t.Fatalf("exit %d, want 1: %s", code, stderr.String())
+	}
+	if n := len(p.Calls()); n != 0 {
+		t.Errorf("the run made %d model calls before it stopped, want 0", n)
+	}
+	if !strings.Contains(stderr.String(), "run log: state directory") {
+		t.Errorf("stderr %q does not say the run log's path can't be worked out", stderr.String())
+	}
+}

@@ -2,6 +2,7 @@ package runlog_test
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -97,5 +98,19 @@ func TestAppend_NotWritten(t *testing.T) {
 	}
 	if f.Logged() {
 		t.Error("the run folder keeps a line that wasn't appended")
+	}
+}
+
+// A line appended that the run folder can't keep is in the run log, and the
+// error says so: it is ErrNotKept.
+func TestAppend_NotKept(t *testing.T) {
+	path := filepath.Join(t.TempDir(), runlog.File)
+	f := &run.Folder{Dir: filepath.Join(t.TempDir(), "gone")}
+	err := runlog.Append(path, f, runlog.Line{RunFolder: f.Dir})
+	if !errors.Is(err, runlog.ErrNotKept) {
+		t.Errorf("Append to a run folder that can't keep the line: %v, want ErrNotKept", err)
+	}
+	if b, rerr := os.ReadFile(path); rerr != nil || strings.Count(string(b), "\n") != 1 {
+		t.Errorf("the run log holds %q (err %v), want the one line", b, rerr)
 	}
 }

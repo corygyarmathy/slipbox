@@ -13,11 +13,15 @@
 // Each run appends one line: the run folder keeps the line it appended
 // (run.LoggedFile), and a run folder that has it appends no other, as when a
 // run kept with -keep is resumed again. A run whose line can't be appended
-// keeps its run folder, so a resume appends it.
+// keeps its run folder, so a resume appends it. A line that is appended but
+// that the run folder can't keep (ErrNotKept) is in the run log, so the run
+// has succeeded: only a resume of the run folder, kept with -keep, would
+// append it again.
 package runlog
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -29,6 +33,10 @@ import (
 
 // File is the run log's name in the state directory.
 const File = "run-log.jsonl"
+
+// ErrNotKept is what Append gives when it has appended the line, but the run
+// folder could not keep it.
+var ErrNotKept = errors.New("the run folder could not keep the line")
 
 // Line is one run's line in the run log.
 type Line struct {
@@ -75,7 +83,7 @@ func Append(path string, folder *run.Folder, line Line) error {
 		return fmt.Errorf("run log: %w", err)
 	}
 	if err := folder.WriteLogged(data); err != nil {
-		return fmt.Errorf("run log: the line is appended to %s, but the run folder could not keep it: %w", path, err)
+		return fmt.Errorf("run log: the line is appended to %s, but %w: %w", path, ErrNotKept, err)
 	}
 	return nil
 }
