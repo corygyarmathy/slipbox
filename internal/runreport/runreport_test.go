@@ -420,4 +420,19 @@ func TestRun_SummaryOfAQuietRun(t *testing.T) {
 			t.Errorf("%s has no %q:\n%s", name, want, got)
 		}
 	}
+
+	// ReadSummary gives the same summary as a value, from the run folder.
+	s, err := runreport.ReadSummary(src, folder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Total != (modelstep.Total{Calls: 2, CostUSD: 1.25, Seconds: 40}) {
+		t.Errorf("ReadSummary's total is %+v", s.Total)
+	}
+	if len(s.Steps) != 2 || s.Steps[0].Step != run.LossProposerDir || s.Steps[1].Step != run.KeptLossDir {
+		t.Errorf("ReadSummary's steps are %+v, want the loss proposer's then the kept-loss repair's", s.Steps)
+	}
+	if one := (mechcheck.CoverageTotals{Covered: 1, Total: 2}); s.CoverageBefore != one || s.CoverageAfter != one {
+		t.Errorf("ReadSummary's coverage is %+v before and %+v after, want %+v", s.CoverageBefore, s.CoverageAfter, one)
+	}
 }
