@@ -5,9 +5,9 @@
 // needs action. It opens with a summary of the run (Summary):
 //
 //   - Covered sentences: the frame's covered sentences out of its total,
-//     with the percentage, before kept losses, as step 1.2 on the repaired
-//     notes counted them, and after, as the kept-loss repair's re-check
-//     did. A frame with no sentences to count has no percentage.
+//     with the percentage, before kept losses, as step 1.2 counts them on
+//     the repaired notes, and after, as it counts them on the kept-loss
+//     repair's notes. A frame with no sentences to count has no percentage.
 //   - Counts: losses added, statements that still fail, items dropped, and
 //     segments that fell back in stages 2 and 3, each the number of lines
 //     in its section below.
@@ -15,7 +15,8 @@
 //     in run order: the models and effort levels its calls asked for, each
 //     with the full model ids their usage names, its calls, their cost in
 //     dollars at API rates and their seconds added up, then a total row,
-//     the run's whole total that the final terminal line prints. A step's
+//     the run's whole total that the final terminal line prints, worked
+//     out from the steps' unrounded figures. A step's
 //     row counts every call its log holds, so the kept-loss repair's
 //     includes its re-check's step 1.3a calls, and the loss proposer's both
 //     its runs. The seconds are the calls' time added up, more than the run
@@ -111,7 +112,7 @@ type Input struct {
 	// Steps are each model step's usage, in run order.
 	Steps []modelstep.StepTotal
 	// CoverageBefore is step 1.2's coverage on the repaired notes, before
-	// kept losses, and CoverageAfter the kept-loss repair's re-check's.
+	// kept losses, and CoverageAfter its coverage on the kept-loss repair's.
 	CoverageBefore, CoverageAfter mechcheck.CoverageTotals
 	// Staged names the notes without links, for the copy step 3.2 stages.
 	Staged bool
@@ -177,13 +178,26 @@ func read(src *source.Source, folder *run.Folder) (Input, error) {
 		return len(modelSteps)
 	}
 	slices.SortStableFunc(in.Steps, func(a, b modelstep.StepTotal) int { return order(a) - order(b) })
-	if in.CoverageBefore, err = mechcheck.ReadCoverage(folder, run.MechanicalRecheckDir); err != nil {
+	if in.CoverageBefore, err = coverage(src, folder, run.RepairNotes); err != nil {
 		return in, err
 	}
-	if in.CoverageAfter, err = mechcheck.ReadCoverage(folder, path.Join(run.KeptLossDir, run.KeptLossMechanicalDir)); err != nil {
+	if in.CoverageAfter, err = coverage(src, folder, run.KeptLossNotes); err != nil {
 		return in, err
 	}
 	return in, nil
+}
+
+// coverage gives step 1.2's coverage totals on the notes in the run folder's
+// directory dir, slash-separated. The check is cheap and gives the same
+// totals each time, so the report works them out from the notes the two
+// re-checks read rather than from a file of theirs, which a run folder made
+// before the summary would lack.
+func coverage(src *source.Source, folder *run.Folder, dir string) (mechcheck.CoverageTotals, error) {
+	notes, err := note.ReadDir(filepath.Join(folder.Dir, filepath.FromSlash(dir)))
+	if err != nil {
+		return mechcheck.CoverageTotals{}, err
+	}
+	return mechcheck.Check(src, notes).Coverage.Totals(), nil
 }
 
 // Summary is the run report's opening section as a value: the models,
@@ -218,12 +232,16 @@ func (in Input) Summary() Summary {
 		Dropped:        len(in.dropped()),
 	}
 	for _, st := range in.Steps {
-		s.Total.Calls += st.Calls
-		s.Total.CostUSD += st.CostUSD
-		s.Total.Seconds += st.Seconds
+		s.Total.Add(st.Total)
 	}
-	s.Stage2Fallbacks = len(in.fallbacks(fallbackSteps[0]))
-	s.Stage3Fallbacks = len(in.fallbacks(fallbackSteps[1]))
+	for _, st := range fallbackSteps {
+		switch n := len(in.fallbacks(st)); st.dir {
+		case run.SplitGatesDir:
+			s.Stage2Fallbacks = n
+		case run.FormatGateDir:
+			s.Stage3Fallbacks = n
+		}
+	}
 	return s
 }
 
@@ -295,7 +313,7 @@ func summary(b *strings.Builder, s Summary) {
 		row(st.Step, strings.Join(models, "; "), st.Total)
 	}
 	row("Total", "", s.Total)
-	b.WriteString("\nCost is in dollars at API rates. Seconds are the calls' time added up, more than the run took when calls ran in parallel.\n")
+	b.WriteString("\nCost is in dollars at API rates. Seconds are the calls' time added up, more than the run took when calls ran in parallel. The total row adds up the steps' unrounded figures, so it can differ from the rows above by a cent or a second.\n")
 }
 
 // lossesAdded gives a line for each kept loss the kept-loss call added a

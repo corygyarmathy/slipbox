@@ -430,6 +430,13 @@ type Total struct {
 	Seconds float64 `json:"seconds"`
 }
 
+// Add adds o's calls, cost and seconds to t.
+func (t *Total) Add(o Total) {
+	t.Calls += o.Calls
+	t.CostUSD += o.CostUSD
+	t.Seconds += o.Seconds
+}
+
 // add adds one call's usage to t.
 func (t *Total) add(u provider.Usage) {
 	t.Calls++
