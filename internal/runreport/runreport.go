@@ -22,7 +22,8 @@
 //     its runs. The seconds are the calls' time added up, more than the run
 //     took when calls ran in parallel.
 //
-// The summary is a value, so other records of a run can take it as it is.
+// The summary is a value, so other records of a run can take it as it is:
+// the run log appends it, read again from the run folder (ReadSummary).
 // Five sections follow it, with one line per item:
 //
 //  1. Losses added: each kept loss the kept-loss call added a statement for.
@@ -138,6 +139,17 @@ func Run(src *source.Source, folder *run.Folder) error {
 		return err
 	}
 	return step.Commit()
+}
+
+// ReadSummary gives the summary of folder's run, as Run works it out, from
+// the run folder rather than from the report, so that the run log takes the
+// value itself.
+func ReadSummary(src *source.Source, folder *run.Folder) (Summary, error) {
+	in, err := read(src, folder)
+	if err != nil {
+		return Summary{}, fmt.Errorf("run report: %w", err)
+	}
+	return in.Summary(), nil
 }
 
 func read(src *source.Source, folder *run.Folder) (Input, error) {
