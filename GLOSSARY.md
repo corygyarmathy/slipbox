@@ -111,7 +111,7 @@ An item the loss proposer wrote whose quotes cite no line of its segment's uncov
 _Avoid_: comment, non-loss
 
 **Run report**:
-What a run writes about itself, one line per item and nothing that needs action: each kept loss added, each statement that still fails after the repair pass, each item dropped and why, each segment that fell back and why, and the asides and the name spans that point outside their segment, counted. It replaced the checkpoint, the human review a run once stopped for after stage 1.
+What a run writes about itself, nothing that needs action: a summary of coverage before and after the kept losses, each section's count, and each model step's models, calls, cost and time, then one line per item: each kept loss added, each statement that still fails after the repair pass, each item dropped and why, each segment that fell back and why, and the asides and the name spans that point outside their segment, counted. It replaced the checkpoint, the human review a run once stopped for after stage 1.
 _Avoid_: review packet, checkpoint
 
 **Fallback**:
