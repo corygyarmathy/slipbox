@@ -106,12 +106,13 @@ documents the layout. A successful run deletes the folder once its notes are
 staged, unless it is given `-keep`.
 
 Before that, a successful run appends one line to the **run log**,
-`run-log.jsonl` in `$XDG_STATE_HOME/s2n/` (`~/.local/state/s2n/`), beside the
-`runs/` directory that holds the run folders by default. The line is the run
-report's summary as JSON, with the source's name, the run folder's path and
-the time the run finished, so runs can be compared, such as before and after a
-brief is re-trialled, without reading each report. Only a run that completes
-step 3.2 appends a line, once: a run that stops appends nothing until a resume
+`run-log.jsonl` in `$XDG_STATE_HOME/s2n/` (`~/.local/state/s2n/` when the
+variable is unset or not an absolute path), beside the `runs/` directory that
+holds the run folders by default. The line is the run report's summary as
+JSON, with the source's name, the run folder's path and the time the run
+finished, so runs can be compared, such as before and after a brief is
+re-trialled, without reading each report. Only a run that completes step 3.2
+appends a line, once: a run that stops appends nothing until a resume
 completes it. A line that can't be appended keeps the run folder, so a resume
 appends it. Package `runlog` says how.
 

@@ -29,15 +29,15 @@
 // beside them. The run then appends one line to the run log,
 // $XDG_STATE_HOME/s2n/run-log.jsonl (package runlog): the run report's
 // summary, with the source's name, the run folder's path and the time the
-// run finished. A run that stops appends nothing, and a run folder that
-// has appended its line appends no other. Then the run folder is deleted,
-// once the run's model calls and their cost are printed. With -keep the run
+// run finished. A run that stops appends nothing, and a run folder that has
+// appended its line appends no other. Then the run folder is deleted, once
+// the run's model calls and their cost are printed. With -keep the run
 // folder is kept instead, so that what the run did can be read after it. A
 // line that can't be appended leaves the notes staged and keeps the run
 // folder, with exit status 1, and resuming it appends the line. A staging
 // folder that already holds anything stops the run before it writes there.
-// A run that can reach step 3.2, with no
-// -stop-after before it, checks the vault and the staging folder before it
+// A run that can reach step 3.2, with no -stop-after before it, checks the
+// vault and the staging folder, and works out the run log's path, before it
 // runs a step, so that a stop there comes before any model call. With
 // -stop-after STEP the run stops after that step instead, with exit status 0.
 //
@@ -207,8 +207,13 @@ func runCommand(ctx context.Context, args []string, stdout, stderr io.Writer, p 
 		opts.staging = stageout.DefaultStaging(opts.vault, src.Name)
 	}
 	var stopped string
-	if reachesStageOut(folder, opts) {
+	reaches := reachesStageOut(folder, opts)
+	if reaches {
 		err = stageout.Check(folder, opts.vault, opts.staging)
+	}
+	var logPath string
+	if err == nil && (reaches || folder.Complete(run.StageOutDir)) {
+		logPath, err = runlog.Path()
 	}
 	var latest *provider.Reading
 	if err == nil {
@@ -254,7 +259,9 @@ func runCommand(ctx context.Context, args []string, stdout, stderr io.Writer, p 
 			fmt.Fprintf(stderr, "%s: the notes are staged in %s, but the run folder %s is kept, as its usage could not be added up: %v\n", name, opts.staging, folder.Dir, err)
 			return 1
 		}
-		if logPath, err := appendRunLog(src, folder); err != nil {
+		if err := appendRunLog(logPath, src, folder); errors.Is(err, runlog.ErrNotKept) {
+			fmt.Fprintf(stderr, "%s: %v. Resuming the run folder would append the line again.\n", name, err)
+		} else if err != nil {
 			fmt.Fprintf(stderr, "%s: the notes are staged in %s, but the run folder %s is kept, as the run's line could not be appended to the run log %s: %v. Run %s to append it.\n", name, opts.staging, folder.Dir, logPath, err, resumeCommand(opts, folder.Dir))
 			return 1
 		}
@@ -274,19 +281,14 @@ func runCommand(ctx context.Context, args []string, stdout, stderr io.Writer, p 
 	return 0
 }
 
-// appendRunLog appends the run in folder's line to the run log, with the
-// run report's summary read from folder, and gives the run log's path, or ""
-// if it couldn't be worked out.
-func appendRunLog(src *source.Source, folder *run.Folder) (string, error) {
-	path, err := runlog.Path()
-	if err != nil {
-		return "", err
-	}
+// appendRunLog appends the run in folder's line to the run log at path, with
+// the run report's summary read from folder.
+func appendRunLog(path string, src *source.Source, folder *run.Folder) error {
 	summary, err := runreport.ReadSummary(src, folder)
 	if err != nil {
-		return path, err
+		return err
 	}
-	return path, runlog.Append(path, folder, runlog.Line{Source: src.Name, RunFolder: folder.Dir, Finished: time.Now().UTC(), Summary: summary})
+	return runlog.Append(path, folder, runlog.Line{Source: src.Name, RunFolder: folder.Dir, Finished: time.Now().UTC(), Summary: summary})
 }
 
 // printStop prints summary, what command name says when a gate stops the
