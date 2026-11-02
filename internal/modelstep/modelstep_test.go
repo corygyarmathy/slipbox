@@ -400,6 +400,64 @@ func TestTotals_AddsUpEveryUsageLog(t *testing.T) {
 	}
 }
 
+// StepTotals adds up each usage log on its own, a nested one under its own
+// directory, and gives each model and effort level its calls asked for, in
+// the order the log first gives them, with the full model ids their usage
+// names. A failed call is counted, and names none.
+func TestStepTotals_AddsUpEachUsageLog(t *testing.T) {
+	dir := t.TempDir()
+	logs := map[string]string{
+		"1.1-extract/" + run.UsageFile: `{"step":"1.1-extract","segment":0,"model":"opus","effort":"medium","cost_usd":1.25,"seconds":60,"models":{"claude-opus-5-5":{},"claude-haiku-5-5":{}}}
+{"step":"1.1-extract","segment":1,"model":"opus","effort":"medium","cost_usd":0.5,"seconds":30,"models":{"claude-opus-5-5":{}}}
+`,
+		"1.4-kept-loss-repair/" + run.UsageFile: `{"step":"1.4-kept-loss-repair","segment":0,"model":"opus","effort":"medium","cost_usd":1,"seconds":40,"models":{"claude-opus-5-5":{}}}
+{"step":"recheck-1.3a-support-check","segment":0,"model":"sonnet","effort":"medium","cost_usd":0.25,"seconds":10,"models":{"claude-sonnet-5-5":{}}}
+{"step":"1.4-kept-loss-repair","segment":1,"model":"opus","effort":"high","cost_usd":0.5,"seconds":20,"is_error":true}
+`,
+		"x/nested/" + run.UsageFile: `{"step":"y","model":"haiku","effort":"low","cost_usd":0.125,"seconds":5,"models":{"claude-haiku-5-5":{}}}` + "\n",
+		"1.1-extract/raw/0.txt":     "not a usage log\n",
+	}
+	for rel, text := range logs {
+		p := filepath.Join(dir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := modelstep.StepTotals(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []modelstep.StepTotal{
+		{Step: "1.1-extract", Total: modelstep.Total{Calls: 2, CostUSD: 1.75, Seconds: 90}, Models: []modelstep.Model{
+			{Model: "opus", Effort: "medium", Used: []string{"claude-haiku-5-5", "claude-opus-5-5"}},
+		}},
+		{Step: "1.4-kept-loss-repair", Total: modelstep.Total{Calls: 3, CostUSD: 1.75, Seconds: 70}, Models: []modelstep.Model{
+			{Model: "opus", Effort: "medium", Used: []string{"claude-opus-5-5"}},
+			{Model: "sonnet", Effort: "medium", Used: []string{"claude-sonnet-5-5"}},
+			{Model: "opus", Effort: "high", Used: []string{}},
+		}},
+		{Step: "x/nested", Total: modelstep.Total{Calls: 1, CostUSD: 0.125, Seconds: 5}, Models: []modelstep.Model{
+			{Model: "haiku", Effort: "low", Used: []string{"claude-haiku-5-5"}},
+		}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("StepTotals =\n %+v\nwant\n %+v", got, want)
+	}
+
+	if got, err := modelstep.StepTotals(t.TempDir()); got != nil || err != nil {
+		t.Errorf("StepTotals of a folder with no logs = %+v, %v", got, err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, run.UsageFile), []byte("{not json\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := modelstep.StepTotals(dir); err == nil {
+		t.Errorf("StepTotals of a broken log = nil error, want one")
+	}
+}
+
 // counting serves each segment a reply naming its prompt, fails the call
 // whose user prompt is fail, and counts the calls by user prompt.
 type counting struct {
