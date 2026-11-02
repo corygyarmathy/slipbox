@@ -6,7 +6,9 @@
 // segments it finished (Folder.Begin).
 //
 // A run folder is `<root>/<source name>/<UTC timestamp>/`, where root
-// defaults to `$XDG_STATE_HOME/s2n/runs` (`~/.local/state/s2n/runs`).
+// defaults to `runs` in the state directory, `$XDG_STATE_HOME/s2n`
+// (`~/.local/state/s2n`). The run log, `run-log.jsonl`, sits beside it in
+// the state directory (package runlog).
 //
 // The run's first act copies the source into the folder, so later steps and
 // `s2n resume` read the frame the run started from:
@@ -19,6 +21,12 @@
 //
 //	STOPPED.md                what failed the gate, where, and what to do, as the
 //	                          terminal gave it
+//
+// A run that has appended its line to the run log has, at the top of its
+// folder, the line it appended, so that resuming a run folder kept after it
+// succeeded appends no second one:
+//
+//	LOGGED.json               the run's line in the run log
 //
 // Step directories:
 //
@@ -166,9 +174,10 @@
 //	                          the run folder, with the name-clash list and the run report
 //	  name-clashes.md         a copy of the staging folder's name-clash list
 //
-// Once step 3.2 is complete the run has succeeded, and its run folder is
-// deleted, unless the run was given -keep. A run stopped earlier, by a gate,
-// an error or -stop-after, keeps it.
+// Once step 3.2 is complete the run has succeeded: it appends its line to the
+// run log, and its run folder is deleted, unless the run was given -keep. A
+// run stopped earlier, by a gate, an error or -stop-after, keeps it and
+// appends nothing.
 package run
 
 import (
@@ -188,6 +197,10 @@ const SourceDir = "source"
 // StoppedFile is the summary of a gate's stop, at the top of the run folder,
 // there only while the run is stopped.
 const StoppedFile = "STOPPED.md"
+
+// LoggedFile is the run's line in the run log, at the top of the run folder,
+// there once the run has appended it.
+const LoggedFile = "LOGGED.json"
 
 // Step directory names.
 const (
@@ -336,19 +349,29 @@ type Folder struct {
 	Dir string
 }
 
-// DefaultRoot is where run folders go when none is given:
-// `$XDG_STATE_HOME/s2n/runs`, falling back to `~/.local/state/s2n/runs`.
-// It is outside the vault, which receives only the staged output.
-func DefaultRoot() (string, error) {
+// StateDir is s2n's state directory, which holds the default root and the
+// run log: `$XDG_STATE_HOME/s2n`, falling back to `~/.local/state/s2n`
+// when the variable is unset or not an absolute path.
+func StateDir() (string, error) {
 	state := os.Getenv("XDG_STATE_HOME")
 	if state == "" || !filepath.IsAbs(state) {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return "", fmt.Errorf("run folder: %w", err)
+			return "", fmt.Errorf("state directory: %w", err)
 		}
 		state = filepath.Join(home, ".local", "state")
 	}
-	return filepath.Join(state, "s2n", "runs"), nil
+	return filepath.Join(state, "s2n"), nil
+}
+
+// DefaultRoot is where run folders go when none is given: `runs` in the
+// StateDir. It is outside the vault, which receives only the staged output.
+func DefaultRoot() (string, error) {
+	state, err := StateDir()
+	if err != nil {
+		return "", fmt.Errorf("run folder: %w", err)
+	}
+	return filepath.Join(state, "runs"), nil
 }
 
 // NewIn makes a new run folder for sourceName under root, named for now.
@@ -406,6 +429,23 @@ func (f *Folder) ClearStopped() error {
 		return err
 	}
 	return nil
+}
+
+// LoggedPath is the path of the run's LoggedFile.
+func (f *Folder) LoggedPath() string {
+	return filepath.Join(f.Dir, LoggedFile)
+}
+
+// Logged says whether the run has appended its line to the run log: its
+// LoggedFile exists.
+func (f *Folder) Logged() bool {
+	_, err := os.Stat(f.LoggedPath())
+	return err == nil
+}
+
+// WriteLogged writes line, the run's line in the run log, to its LoggedFile.
+func (f *Folder) WriteLogged(line []byte) error {
+	return os.WriteFile(f.LoggedPath(), line, 0o644)
 }
 
 // Complete says whether the step named name is complete: its directory, not
