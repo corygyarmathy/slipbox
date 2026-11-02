@@ -32,6 +32,11 @@
 // whose notes, flags, brief or frame changed since its reply is called
 // again.
 //
+// The runner is the one reader of the usage logs it writes, too: Totals adds
+// up the run's, for the final terminal line, StepTotals each step's, with its
+// models, for the run report, and LatestReading gives the latest usage
+// limits' reading, for a resume.
+//
 // The call shape, the brief then the frame as the system prompt, and the
 // reply's parsing (Split) are as trialled.
 package modelstep
@@ -418,22 +423,77 @@ type usageRecord struct {
 
 // Total is what a run's model calls consumed.
 type Total struct {
-	Calls   int
-	CostUSD float64
+	Calls   int     `json:"calls"`
+	CostUSD float64 `json:"cost_usd"`
 	// Seconds is the calls' time added up, more than the time the run
 	// took when calls ran in parallel.
-	Seconds float64
+	Seconds float64 `json:"seconds"`
+}
+
+// add adds one call's usage to t.
+func (t *Total) add(u provider.Usage) {
+	t.Calls++
+	t.CostUSD += u.CostUSD
+	t.Seconds += u.Seconds
 }
 
 // Totals adds up every usage log in the run folder dir.
 func Totals(dir string) (Total, error) {
 	var t Total
-	err := walkUsage(dir, func(u provider.Usage) {
-		t.Calls++
-		t.CostUSD += u.CostUSD
-		t.Seconds += u.Seconds
-	})
+	err := walkUsage(dir, func(_ string, r usageRecord) { t.add(r.Usage) })
 	return t, err
+}
+
+// StepTotal is what one step's model calls consumed, and the models they
+// used, from its usage log.
+type StepTotal struct {
+	// Step is the directory of the step's usage log, slash-separated from
+	// the run folder. A re-check's calls that the step's log holds, such as
+	// the kept-loss repair's step 1.3a, are the step's.
+	Step string `json:"step"`
+	Total
+	// Models are the models and effort levels the calls asked for, in the
+	// order the log first gives each.
+	Models []Model `json:"models"`
+}
+
+// Model is a model and effort level a step's calls asked for, as its usage
+// log records them, and the models those calls used.
+type Model struct {
+	Model  string `json:"model"`
+	Effort string `json:"effort"`
+	// Used are the full model ids the calls' usage gave tokens for, sorted.
+	// A call can use more than the model it asked for, and a failed one
+	// none.
+	Used []string `json:"used"`
+}
+
+// StepTotals adds up each usage log in the run folder dir on its own, in
+// the order of the logs' paths.
+func StepTotals(dir string) ([]StepTotal, error) {
+	var steps []StepTotal
+	err := walkUsage(dir, func(log string, r usageRecord) {
+		rel, _ := filepath.Rel(dir, filepath.Dir(log))
+		rel = filepath.ToSlash(rel)
+		if len(steps) == 0 || steps[len(steps)-1].Step != rel {
+			steps = append(steps, StepTotal{Step: rel})
+		}
+		st := &steps[len(steps)-1]
+		st.add(r.Usage)
+		i := slices.IndexFunc(st.Models, func(m Model) bool { return m.Model == r.Model && m.Effort == r.Effort })
+		if i < 0 {
+			st.Models = append(st.Models, Model{Model: r.Model, Effort: r.Effort, Used: []string{}})
+			i = len(st.Models) - 1
+		}
+		m := &st.Models[i]
+		for id := range r.Models {
+			if !slices.Contains(m.Used, id) {
+				m.Used = append(m.Used, id)
+			}
+		}
+		slices.Sort(m.Used)
+	})
+	return steps, err
 }
 
 // LatestReading gives the latest usage limits' reading in every usage log in
@@ -441,17 +501,17 @@ func Totals(dir string) (Total, error) {
 // from what the stopped one last read.
 func LatestReading(dir string) (*provider.Reading, error) {
 	var latest *provider.Reading
-	err := walkUsage(dir, func(u provider.Usage) {
-		if u.Reading != nil && (latest == nil || u.Reading.At.After(latest.At)) {
-			latest = u.Reading
+	err := walkUsage(dir, func(_ string, r usageRecord) {
+		if r.Reading != nil && (latest == nil || r.Reading.At.After(latest.At)) {
+			latest = r.Reading
 		}
 	})
 	return latest, err
 }
 
 // walkUsage calls f with each record of every usage log in the run folder
-// dir.
-func walkUsage(dir string, f func(provider.Usage)) error {
+// dir, and the log's path.
+func walkUsage(dir string, f func(log string, r usageRecord)) error {
 	return filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || d.Name() != run.UsageFile {
 			return err
@@ -462,13 +522,13 @@ func walkUsage(dir string, f func(provider.Usage)) error {
 		}
 		defer file.Close()
 		for dec := json.NewDecoder(file); ; {
-			var u provider.Usage
-			if err := dec.Decode(&u); errors.Is(err, io.EOF) {
+			var r usageRecord
+			if err := dec.Decode(&r); errors.Is(err, io.EOF) {
 				return nil
 			} else if err != nil {
 				return fmt.Errorf("%s: %w", p, err)
 			}
-			f(u)
+			f(p, r)
 		}
 	})
 }
