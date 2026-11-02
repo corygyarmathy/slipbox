@@ -89,8 +89,11 @@ No one reviews a run ([ADR 0009](adr/0009-the-run-is-unattended.md)):
   do a few refusals in a row after every reset time has passed.
   Packages `usagelimit` and `modelstep` say how.
 
-The run report says what was added, what still fails, what was dropped and
-what fell back. Choosing what to keep is stage 4.
+The run report opens with a summary of the run: the frame's coverage
+before and after the kept losses, how many items each of its sections
+lists, and each model step's models, calls, cost and time, added up. It
+then says what was added, what still fails, what was dropped and what fell
+back. Choosing what to keep is stage 4.
 
 ### The run folder
 

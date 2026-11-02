@@ -609,7 +609,9 @@ func keys(m map[string]string) []string {
 // source, with invented replies for every step, from step 1.1 to stage out
 // (ADR 0009). Nothing stops it: step 1.5's one proposed loss is added with
 // no review, no segment falls back, and the run report goes into the
-// staging folder with the notes.
+// staging folder with the notes. The report's summary has the coverage the
+// kept loss raised, and each model step's calls, the kept-loss repair's at
+// two tiers.
 func TestRun_GoesUnattendedToStageOut(t *testing.T) {
 	dir := t.TempDir()
 	sourcePath := filepath.Join(dir, "Tiny.md")
@@ -704,7 +706,19 @@ func TestRun_GoesUnattendedToStageOut(t *testing.T) {
 		t.Errorf("staged note is not the stripped one:\n%s", got["Alpha and Beta.md"])
 	}
 	report := got[stageout.RunReportFile]
-	for _, w := range []string{"## Losses added\n\n- Loss 0.1: Beta is second.\n", "## Statements that still fail\n\nNone.\n", "## Dropped\n\nNone.\n", "## Fallbacks\n\nNone.\n", "- Asides: 0\n"} {
+	summary := "## Summary\n\n" +
+		"- Covered sentences: 1/2 (50%) before kept losses, 2/2 (100%) after.\n" +
+		"- Losses added: 1. Statements that still fail: 0. Dropped: 0. Fallbacks: 0 in stage 2, 0 in stage 3.\n\n" +
+		"| Step | Models | Calls | Cost | Seconds |\n|---|---|---|---|---|\n" +
+		"| 1.1-extract | opus (medium) | 1 | $0.00 | 0 |\n" +
+		"| 1.3a-support-check | sonnet (medium) | 1 | $0.00 | 0 |\n" +
+		"| 1.3b-reads-alone-check | sonnet (medium) | 1 | $0.00 | 0 |\n" +
+		"| 1.5-loss-proposer | sonnet (medium) | 2 | $0.00 | 0 |\n" +
+		"| 1.4-kept-loss-repair | opus (medium); sonnet (medium) | 2 | $0.00 | 0 |\n" +
+		"| 2.1-split-and-hub | sonnet (medium) | 1 | $0.00 | 0 |\n" +
+		"| 3.1-format | haiku (medium) | 1 | $0.00 | 0 |\n" +
+		"| Total |  | 9 | $0.00 | 0 |\n"
+	for _, w := range []string{summary, "## Losses added\n\n- Loss 0.1: Beta is second.\n", "## Statements that still fail\n\nNone.\n", "## Dropped\n\nNone.\n", "## Fallbacks\n\nNone.\n", "- Asides: 0\n"} {
 		if !strings.Contains(report, w) {
 			t.Errorf("the run report has no %q:\n%s", w, report)
 		}
