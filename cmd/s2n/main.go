@@ -26,10 +26,17 @@
 // and the asides and name spans that point outside their segment. Last, step
 // 3.2 stages the notes out into the staging folder, which defaults to
 // <vault>/Staging/<source name>/, with the name-clash list and the run report
-// beside them, and the run folder is deleted, once the run's model calls and
-// their cost are printed. With -keep the run folder is kept instead, so that
-// what the run did can be read after it. A staging folder that already holds anything stops
-// the run before it writes there. A run that can reach step 3.2, with no
+// beside them. The run then appends one line to the run log,
+// $XDG_STATE_HOME/s2n/run-log.jsonl (package runlog): the run report's
+// summary, with the source's name, the run folder's path and the time the
+// run finished. A run that stops appends nothing, and a run folder that
+// has appended its line appends no other. Then the run folder is deleted,
+// once the run's model calls and their cost are printed. With -keep the run
+// folder is kept instead, so that what the run did can be read after it. A
+// line that can't be appended leaves the notes staged and keeps the run
+// folder, with exit status 1, and resuming it appends the line. A staging
+// folder that already holds anything stops the run before it writes there.
+// A run that can reach step 3.2, with no
 // -stop-after before it, checks the vault and the staging folder before it
 // runs a step, so that a stop there comes before any model call. With
 // -stop-after STEP the run stops after that step instead, with exit status 0.
@@ -85,6 +92,7 @@ import (
 	"github.com/corygyarmathy/slipbox/internal/readsalone"
 	"github.com/corygyarmathy/slipbox/internal/repair"
 	"github.com/corygyarmathy/slipbox/internal/run"
+	"github.com/corygyarmathy/slipbox/internal/runlog"
 	"github.com/corygyarmathy/slipbox/internal/runreport"
 	"github.com/corygyarmathy/slipbox/internal/source"
 	"github.com/corygyarmathy/slipbox/internal/split"
@@ -246,6 +254,10 @@ func runCommand(ctx context.Context, args []string, stdout, stderr io.Writer, p 
 			fmt.Fprintf(stderr, "%s: the notes are staged in %s, but the run folder %s is kept, as its usage could not be added up: %v\n", name, opts.staging, folder.Dir, err)
 			return 1
 		}
+		if logPath, err := appendRunLog(src, folder); err != nil {
+			fmt.Fprintf(stderr, "%s: the notes are staged in %s, but the run folder %s is kept, as the run's line could not be appended to the run log %s: %v. Run %s to append it.\n", name, opts.staging, folder.Dir, logPath, err, resumeCommand(opts, folder.Dir))
+			return 1
+		}
 		fate := "deleted"
 		if opts.keep {
 			fate = "kept"
@@ -260,6 +272,21 @@ func runCommand(ctx context.Context, args []string, stdout, stderr io.Writer, p 
 		return 0
 	}
 	return 0
+}
+
+// appendRunLog appends the run in folder's line to the run log, with the
+// run report's summary read from folder, and gives the run log's path, or ""
+// if it couldn't be worked out.
+func appendRunLog(src *source.Source, folder *run.Folder) (string, error) {
+	path, err := runlog.Path()
+	if err != nil {
+		return "", err
+	}
+	summary, err := runreport.ReadSummary(src, folder)
+	if err != nil {
+		return path, err
+	}
+	return path, runlog.Append(path, folder, runlog.Line{Source: src.Name, RunFolder: folder.Dir, Finished: time.Now().UTC(), Summary: summary})
 }
 
 // printStop prints summary, what command name says when a gate stops the
