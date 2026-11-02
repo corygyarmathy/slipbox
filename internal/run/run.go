@@ -37,6 +37,8 @@
 //	  uncovered/<n>.txt       segment n's uncovered list for its loss proposer, if it has one
 //	  findings.json           every note's findings, the report's notes in its order, for
 //	                          the steps that read step 1.2's findings
+//	  coverage.json           the coverage totals, covered sentences out of the frame's, for
+//	                          the run report
 //	1.3a-support-check/       step 1.3a, the support and cuts check
 //	  reports/<n>.md          segment n's checker report, the reply as received
 //	  flags/<n>.json          segment n's report parsed: its flags, and its other lines kept as text
@@ -153,10 +155,12 @@
 //	                          2.2-strip-traces/stage-2 notes unformatted
 //	  fallbacks.json          each segment that fell back, 3.1-format's among them, and why
 //	run-report/
-//	  report.md               the run report: each loss added, each statement that still
-//	                          fails, each item dropped, each segment that fell back, and the
-//	                          asides and name spans that point outside their segment,
-//	                          counted, with links into the run folder
+//	  report.md               the run report: a summary of the run's coverage, counts, and
+//	                          each model step's models, cost and time, then each loss added,
+//	                          each statement that still fails, each item dropped, each
+//	                          segment that fell back, and the asides and name spans that
+//	                          point outside their segment, counted, with links into the
+//	                          run folder
 //	  staged-report.md        the same report naming the notes without links, which step 3.2
 //	                          copies into the staging folder
 //	3.2-stage-out/            step 3.2, stage out, once 3.1-gate is complete. It copies
@@ -321,6 +325,8 @@ const (
 	CoverageFile = "coverage.txt"
 	UncoveredDir = "uncovered"
 	FindingsFile = "findings.json"
+	// CoverageTotalsFile holds the coverage totals for the run report.
+	CoverageTotalsFile = "coverage.json"
 )
 
 // FlagsDir holds a checker step's parsed reports, beside its reports.
