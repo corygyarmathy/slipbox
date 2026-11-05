@@ -5,7 +5,7 @@ The language of the procedure that turns a source text into refined notes, with 
 ## Units
 
 **Stage**:
-One of the procedure's four phases: stage 1 extracts traced notes, stage 2 splits them into atomic notes under a hub, stage 3 formats them, and stage 4 integrates them into the vault, which is the user's own work. Each stage is a sequence of numbered steps.
+One of the procedure's four phases: stage 1 extracts traced notes, stage 2 splits them into argument notes, stage 3 formats them, and stage 4 integrates them into the vault, which is the user's own work. Each stage is a sequence of numbered steps.
 _Avoid_: phase, pass
 
 **Frame**:
@@ -16,16 +16,12 @@ _Avoid_: context, window
 A section of a frame, or the untitled text before its first heading; the unit written in one pass, whose notes trace only into it, save name spans.
 _Avoid_: chunk, part
 
-**Hub note**:
-An ordinary note per segment that links its atomic notes, as a numbered list in argument order, with each aside nested under the note it digresses from; an entry point, not a parent. It carries no statements or traces.
-_Avoid_: parent note, index note, MOC
-
-**Atomic note**:
-A stage 2 note holding one idea (a proposition, or an argument with its premises) that reads alone, without its hub or neighbours; in practice about one stage 1 paragraph. A split that leaves a note opening on a reference it can't resolve with a name span is the wrong split.
-_Avoid_: card, zettel, chunk
+**Argument note**:
+A stage 2 note holding one argument of a segment whole, its premises and its conclusion, with the segment's sub-sections as its headings. Usually one per segment, two when a segment makes two arguments, and never one across segments: joining those is stage 4. It reads alone because it holds the whole argument; a split that leaves a note opening on a reference it can't resolve with a name span is the wrong split.
+_Avoid_: atomic note, hub note, card, zettel, chunk
 
 **Statement**:
-One sentence or list item in an atomic note; the unit that carries traces and that the support check judges.
+One sentence or list item in a note; the unit that carries traces and that the support check judges.
 _Avoid_: claim, line
 
 **Joining text**:
@@ -33,7 +29,7 @@ Words in a statement that aren't quoted from the source but connect quoted mater
 _Avoid_: glue, connective
 
 **Aside**:
-A significant digression in a segment that makes a point of its own, beyond the segment's argument; extracted into its own traced note rather than dropped. It is marked as an aside only in its hub (`- Aside: [[...]]`), never in the note itself.
+A significant digression in a segment that makes a point of its own, beyond the segment's argument; extracted into its own traced note rather than dropped, and in stage 2 its own argument note, placed in book order after the argument it digresses from. Nothing marks it as an aside in the output.
 _Avoid_: tangent, side note
 
 ## Selection
@@ -115,7 +111,7 @@ What a run writes about itself, nothing that needs action: a summary of coverage
 _Avoid_: review packet, checkpoint
 
 **Fallback**:
-A segment's notes when a stage 2 or 3 step fails it: the notes the stage before gave that segment, carried on so the run completes. A segment that falls back in stage 2 keeps its stage 1 notes under a hub of its own; one that falls back in stage 3 keeps its notes unformatted.
+A segment's notes when a stage 2 or 3 step fails it: the notes the stage before gave that segment, carried on so the run completes. A segment that falls back in stage 2 keeps its stage 1 notes undivided, titled after their headings; one that falls back in stage 3 keeps its notes unformatted.
 _Avoid_: drop (a dropped item is gone), skip
 
 ## The run
@@ -157,5 +153,5 @@ The per-source folder in the vault where a run leaves its finished notes, the na
 _Avoid_: output folder, inbox
 
 **Name-clash list**:
-The finished notes whose names match an existing slip-box note, ignoring case. It renames nothing: replacing, merging or linking is decided in stage 4.
+The finished notes whose names, less their book-order number, match an existing slip-box note or another note of the run, ignoring case. It renames nothing: replacing, merging or linking is decided in stage 4.
 _Avoid_: conflicts, duplicates

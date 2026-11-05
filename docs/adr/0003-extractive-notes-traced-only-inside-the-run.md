@@ -14,7 +14,7 @@ The notes have to say what the source says, not what a model thinks it says. A m
 
 1. Every statement is built from contiguous verbatim quotes of its segment. The only new wording is joining text, and a name span is the only quote that may come from elsewhere in the frame or from the source's bibliographic record.
 2. Each quote is a **trace**: a footnote naming its section and quoting the source. Traces are load-bearing from stage 1 until stage 2's gates, which pair statements by their quote sets.
-3. Step 2.2 then strips every trace, and gives each atomic note one **source footnote** in their place. Stage 3, stage out and the vault never see a trace, and no traced copy is archived.
+3. Step 2.2 then strips every trace, and gives each note one **source footnote** in their place. Stage 3, stage out and the vault never see a trace, and no traced copy is archived.
 
 ## Consequences
 
