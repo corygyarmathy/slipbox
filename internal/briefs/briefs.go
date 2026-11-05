@@ -17,6 +17,11 @@
 //
 // stage-2-edit-check.md has no step: it graded stage 2's name-span edits by
 // hand, and s2n doesn't run it.
+//
+// stage-2-arguments.md is the step 2.1 brief ADR 0012 calls for, drafted
+// before the code that reads its reply. Nothing embeds it yet: it replaces
+// stage-2.md when step 2.1 builds argument notes from its reply, and it has
+// not been trialled.
 package briefs
 
 import _ "embed"
